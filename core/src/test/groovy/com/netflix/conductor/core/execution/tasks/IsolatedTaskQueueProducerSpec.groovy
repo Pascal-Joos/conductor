@@ -47,14 +47,21 @@ class IsolatedTaskQueueProducerSpec extends Specification {
 
     @Test
     def "addTaskQueuesAddsElementToQueue"() {
-        given:
+        systemTaskWorker = Mock(SystemTaskWorker.class)
+        metadataService = Mock(MetadataService.class)
+        def asyncSystemTask = new WorkflowSystemTask("asyncTask") {
+            @Override
+            boolean isAsync() { return true }
+        }
+        def isolatedTaskQueueProducer = new IsolatedTaskQueueProducer(metadataService, [asyncSystemTask] as Set, systemTaskWorker, false, Duration.ofSeconds(10))
+
         TaskDef taskDef = new TaskDef(isolationGroupId: "isolated")
+        metadataService.getTaskDefs() >> Collections.singletonList(taskDef)
 
         when:
         isolatedTaskQueueProducer.addTaskQueues()
 
         then:
-        1 * systemTaskWorker.startPolling(asyncSystemTask, "${asyncSystemTask.taskType}-${taskDef.isolationGroupId}")
-        1 * metadataService.getTaskDefs() >> Collections.singletonList(taskDef)
+        1 * systemTaskWorker.startPolling(_ as WorkflowSystemTask, "asyncTask-${taskDef.isolationGroupId}")
     }
 }
