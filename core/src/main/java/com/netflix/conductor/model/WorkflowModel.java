@@ -97,7 +97,7 @@ public class WorkflowModel {
 
     @Nullable private String ownerApp;
 
-    @Nullable private Long createTime;
+    @Nullable private long createTime;
 
     @Nullable private Long updatedTime;
 
@@ -385,11 +385,11 @@ public class WorkflowModel {
         this.ownerApp = ownerApp;
     }
 
-    public Long getCreateTime() {
+    public long getCreateTime() {
         return createTime;
     }
 
-    public void setCreateTime(Long createTime) {
+    public void setCreateTime(long createTime) {
         this.createTime = createTime;
     }
 
