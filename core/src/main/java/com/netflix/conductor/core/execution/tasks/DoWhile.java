@@ -225,7 +225,9 @@ public class DoWhile extends WorkflowSystemTask {
                         workflow,
                         task.getTaskId(),
                         taskDefinition);
-        conditionInput.put(task.getReferenceTaskName(), task.getOutputData());
+        if (task.getReferenceTaskName() != null) {
+            conditionInput.put(task.getReferenceTaskName(), task.getOutputData());
+        }
         List<TaskModel> loopOver =
                 workflow.getTasks().stream()
                         .filter(
