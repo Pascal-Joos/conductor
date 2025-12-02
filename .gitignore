@@ -1,5 +1,6 @@
 # Java Build
 .gradle
+.gradle-cache
 .classpath
 dump.rdb
 out
