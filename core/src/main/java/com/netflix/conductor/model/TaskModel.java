@@ -120,7 +120,7 @@ public class TaskModel {
 
     @Nullable private String workerId;
 
-    @Nullable private WorkflowTask workflowTask;
+    private WorkflowTask workflowTask = new WorkflowTask();
 
     @Nullable private String domain;
 
