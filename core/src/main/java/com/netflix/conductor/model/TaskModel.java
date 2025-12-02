@@ -370,9 +370,6 @@ public class TaskModel {
     }
 
     public String getTaskId() {
-        if (taskId == null) {
-            taskId = java.util.UUID.randomUUID().toString();
-        }
         return taskId;
     }
 
