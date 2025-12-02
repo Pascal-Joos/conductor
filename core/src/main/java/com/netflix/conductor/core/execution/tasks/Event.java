@@ -130,9 +130,6 @@ public class Event extends WorkflowSystemTask {
         Map<String, Object> replaced =
                 parametersUtils.getTaskInputV2(input, workflow, task.getTaskId(), null);
         String sinkValue = (String) replaced.get("sink");
-        if (sinkValue == null) {
-            return null;
-        }
         String queueName = sinkValue;
 
         if (sinkValue.startsWith("conductor")) {
