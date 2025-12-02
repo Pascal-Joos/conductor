@@ -79,6 +79,10 @@ public class Inline extends WorkflowSystemTask {
             checkEvaluatorType(evaluatorType);
             checkExpression(expression);
             Evaluator evaluator = evaluators.get(evaluatorType);
+            if (evaluator == null) {
+                throw new TerminateWorkflowException(
+                        "No evaluator registered for type: " + evaluatorType);
+            }
             Object evalResult = evaluator.evaluate(expression, taskInput);
             task.addOutput("result", evalResult);
             task.setStatus(TaskModel.Status.COMPLETED);
