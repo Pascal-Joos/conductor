@@ -42,7 +42,7 @@ public class TaskMapperContext {
         taskInput = builder.taskInput;
         retryCount = builder.retryCount;
         retryTaskId = builder.retryTaskId;
-        taskId = builder.taskId;
+        taskId = java.util.Objects.requireNonNull(builder.taskId, "taskId must not be null");
         deciderService = builder.deciderService;
     }
 
