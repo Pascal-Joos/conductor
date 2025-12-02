@@ -65,8 +65,6 @@ public class WorkflowMonitor {
         this.metadataRefreshInterval = metadataRefreshInterval;
         this.asyncSystemTasks = asyncSystemTasks;
         LOGGER.info("{} initialized.", WorkflowMonitor.class.getSimpleName());
-        this.taskDefs = new java.util.ArrayList<>();
-        this.workflowDefs = new java.util.ArrayList<>();
     }
 
     @Scheduled(
