@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Netflix, Inc.
+ * Copyright 2022 Netflix, Inc.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,11 +14,14 @@ package com.netflix.conductor.core.execution.tasks;
 
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.netflix.conductor.common.metadata.workflow.WorkflowDef;
+import com.netflix.conductor.core.exception.NonTransientException;
+import com.netflix.conductor.core.exception.TransientException;
 import com.netflix.conductor.core.execution.StartWorkflowInput;
 import com.netflix.conductor.core.execution.WorkflowExecutor;
 import com.netflix.conductor.core.operation.StartWorkflowOperation;
@@ -48,31 +51,8 @@ public class SubWorkflow extends WorkflowSystemTask {
     @Override
     public void start(WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
         Map<String, Object> input = task.getInputData();
-
-        Object subWorkflowNameObj = input.get("subWorkflowName");
-        String name;
-        if (subWorkflowNameObj != null) {
-            name = subWorkflowNameObj.toString();
-        } else if (input.get("subWorkflowDefinition") != null) {
-            // name will be set from workflowDefinition below
-            name = null;
-        } else {
-            String reason = "Missing subWorkflowName and subWorkflowDefinition in task input";
-            LOGGER.error(reason + ": {}", task.getTaskId());
-            task.setReasonForIncompletion(reason);
-            task.setStatus(TaskModel.Status.FAILED);
-            return;
-        }
-
-        Object subWorkflowVersionObj = input.get("subWorkflowVersion");
-        if (!(subWorkflowVersionObj instanceof Number)) {
-            String reason = "Missing or invalid subWorkflowVersion in task input";
-            LOGGER.error(reason + ": {}", task.getTaskId());
-            task.setReasonForIncompletion(reason);
-            task.setStatus(TaskModel.Status.FAILED);
-            return;
-        }
-        int version = ((Number) subWorkflowVersionObj).intValue();
+        String name = input.get("subWorkflowName").toString();
+        int version = (int) input.get("subWorkflowVersion");
 
         WorkflowDef workflowDefinition = null;
         if (input.get("subWorkflowDefinition") != null) {
@@ -94,14 +74,6 @@ public class SubWorkflow extends WorkflowSystemTask {
         }
         String correlationId = workflow.getCorrelationId();
 
-        if (name == null) {
-            String reason = "Sub-workflow name is null";
-            LOGGER.error(reason + ": {}", task.getTaskId());
-            task.setReasonForIncompletion(reason);
-            task.setStatus(TaskModel.Status.FAILED);
-            return;
-        }
-
         try {
             StartWorkflowInput startWorkflowInput = new StartWorkflowInput();
             startWorkflowInput.setWorkflowDefinition(workflowDefinition);
@@ -116,13 +88,131 @@ public class SubWorkflow extends WorkflowSystemTask {
             String subWorkflowId = startWorkflowOperation.execute(startWorkflowInput);
 
             task.setSubWorkflowId(subWorkflowId);
-            task.getOutputData().put(SUB_WORKFLOW_ID, subWorkflowId);
-            task.setStatus(TaskModel.Status.IN_PROGRESS);
-        } catch (Exception e) {
-            String reason = "Failed to start sub workflow";
-            LOGGER.error(reason + " for task: {}", task.getTaskId(), e);
-            task.setReasonForIncompletion(reason + ": " + e.getMessage());
+            // For backwards compatibility
+            task.addOutput(SUB_WORKFLOW_ID, subWorkflowId);
+
+            // Set task status based on current sub-workflow status, as the status can change in
+            // recursion by the time we update here.
+            WorkflowModel subWorkflow = workflowExecutor.getWorkflow(subWorkflowId, false);
+            updateTaskStatus(subWorkflow, task);
+        } catch (TransientException te) {
+            LOGGER.info(
+                    "A transient backend error happened when task {} in {} tried to start sub workflow {}.",
+                    task.getTaskId(),
+                    workflow.toShortString(),
+                    name);
+        } catch (Exception ae) {
+
             task.setStatus(TaskModel.Status.FAILED);
+            task.setReasonForIncompletion(ae.getMessage());
+            LOGGER.error(
+                    "Error starting sub workflow: {} from workflow: {}",
+                    name,
+                    workflow.toShortString(),
+                    ae);
         }
+    }
+
+    @Override
+    public boolean execute(
+            WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
+        String workflowId = task.getSubWorkflowId();
+        if (StringUtils.isEmpty(workflowId)) {
+            return false;
+        }
+
+        WorkflowModel subWorkflow = workflowExecutor.getWorkflow(workflowId, false);
+        WorkflowModel.Status subWorkflowStatus = subWorkflow.getStatus();
+        if (!subWorkflowStatus.isTerminal()) {
+            return false;
+        }
+
+        updateTaskStatus(subWorkflow, task);
+        return true;
+    }
+
+    @Override
+    public void cancel(WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
+        String workflowId = task.getSubWorkflowId();
+        if (StringUtils.isEmpty(workflowId)) {
+            return;
+        }
+        WorkflowModel subWorkflow = workflowExecutor.getWorkflow(workflowId, true);
+        subWorkflow.setStatus(WorkflowModel.Status.TERMINATED);
+        String reason =
+                StringUtils.isEmpty(workflow.getReasonForIncompletion())
+                        ? "Parent workflow has been terminated with status " + workflow.getStatus()
+                        : "Parent workflow has been terminated with reason: "
+                                + workflow.getReasonForIncompletion();
+        workflowExecutor.terminateWorkflow(subWorkflow, reason, null);
+    }
+
+    @Override
+    public boolean isAsync() {
+        return true;
+    }
+
+    /**
+     * Keep Subworkflow task asyncComplete. The Subworkflow task will be executed once
+     * asynchronously to move to IN_PROGRESS state, and will move to termination by Subworkflow's
+     * completeWorkflow logic, there by avoiding periodic polling.
+     *
+     * @param task
+     * @return
+     */
+    @Override
+    public boolean isAsyncComplete(TaskModel task) {
+        return true;
+    }
+
+    private void updateTaskStatus(WorkflowModel subworkflow, TaskModel task) {
+        WorkflowModel.Status status = subworkflow.getStatus();
+        switch (status) {
+            case RUNNING:
+            case PAUSED:
+                task.setStatus(TaskModel.Status.IN_PROGRESS);
+                break;
+            case COMPLETED:
+                task.setStatus(TaskModel.Status.COMPLETED);
+                break;
+            case FAILED:
+                task.setStatus(TaskModel.Status.FAILED);
+                break;
+            case TERMINATED:
+                task.setStatus(TaskModel.Status.CANCELED);
+                break;
+            case TIMED_OUT:
+                task.setStatus(TaskModel.Status.TIMED_OUT);
+                break;
+            default:
+                throw new NonTransientException(
+                        "Subworkflow status does not conform to relevant task status.");
+        }
+
+        if (status.isTerminal()) {
+            if (subworkflow.getExternalOutputPayloadStoragePath() != null) {
+                task.setExternalOutputPayloadStoragePath(
+                        subworkflow.getExternalOutputPayloadStoragePath());
+            } else {
+                task.addOutput(subworkflow.getOutput());
+            }
+            if (!status.isSuccessful()) {
+                task.setReasonForIncompletion(
+                        String.format(
+                                "Sub workflow %s failure reason: %s",
+                                subworkflow.toShortString(),
+                                subworkflow.getReasonForIncompletion()));
+            }
+        }
+    }
+
+    /**
+     * We don't need the tasks when retrieving the workflow data.
+     *
+     * @return false
+     */
+    @Override
+    public boolean isTaskRetrievalRequired() {
+        return false;
     }
 }
