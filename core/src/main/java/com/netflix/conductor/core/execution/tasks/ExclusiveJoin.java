@@ -47,7 +47,7 @@ public class ExclusiveJoin extends WorkflowSystemTask {
         StringBuilder failureReason = new StringBuilder();
         TaskModel.Status taskStatus;
         List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
-        if (task.isLoopOverTask()) {
+        if (task.isLoopOverTask() && joinOn != null && !joinOn.isEmpty()) {
             // If exclusive join is part of loop over task, wait for specific iteration to get
             // complete
             joinOn =
@@ -56,21 +56,24 @@ public class ExclusiveJoin extends WorkflowSystemTask {
                             .collect(Collectors.toList());
         }
         TaskModel exclusiveTask = null;
-        for (String joinOnRef : joinOn) {
-            LOGGER.debug("Exclusive Join On Task {} ", joinOnRef);
-            exclusiveTask = workflow.getTaskByRefName(joinOnRef);
-            if (exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
-                LOGGER.debug("The task {} is either not scheduled or skipped.", joinOnRef);
-                continue;
-            }
-            taskStatus = exclusiveTask.getStatus();
-            foundExlusiveJoinOnTask = taskStatus.isTerminal();
-            hasFailures = !taskStatus.isSuccessful();
-            if (hasFailures) {
-                failureReason.append(exclusiveTask.getReasonForIncompletion()).append(" ");
-            }
+        if (joinOn != null && !joinOn.isEmpty()) {
+            for (String joinOnRef : joinOn) {
+                LOGGER.debug("Exclusive Join On Task {} ", joinOnRef);
+                exclusiveTask = workflow.getTaskByRefName(joinOnRef);
+                if (exclusiveTask == null
+                        || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+                    LOGGER.debug("The task {} is either not scheduled or skipped.", joinOnRef);
+                    continue;
+                }
+                taskStatus = exclusiveTask.getStatus();
+                foundExlusiveJoinOnTask = taskStatus.isTerminal();
+                hasFailures = !taskStatus.isSuccessful();
+                if (hasFailures) {
+                    failureReason.append(exclusiveTask.getReasonForIncompletion()).append(" ");
+                }
 
-            break;
+                break;
+            }
         }
 
         if (!foundExlusiveJoinOnTask) {
