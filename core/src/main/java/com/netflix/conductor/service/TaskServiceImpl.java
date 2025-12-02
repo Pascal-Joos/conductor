@@ -172,8 +172,12 @@ public class TaskServiceImpl implements TaskService {
             String errorMsg = String.format("Error when trying to ack task %s", taskId);
             LOGGER.error(errorMsg, e);
             Task task = executionService.getTask(taskId);
-            Monitors.recordAckTaskError(task.getTaskType());
-            failTask(task, errorMsg);
+            if (task != null) {
+                Monitors.recordAckTaskError(task.getTaskType());
+                failTask(task, errorMsg);
+            } else {
+                Monitors.recordAckTaskError("UNKNOWN");
+            }
             ackResult.set(false);
         }
         return ackResult.get();
