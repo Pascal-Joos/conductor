@@ -111,6 +111,17 @@ public class ExclusiveJoin extends WorkflowSystemTask {
                 foundExlusiveJoinOnTask,
                 hasFailures);
         if (foundExlusiveJoinOnTask || hasFailures) {
+            if (exclusiveTask == null) {
+                LOGGER.warn(
+                        "ExclusiveJoin reached terminal state but exclusiveTask is null; workflowId={}, taskId={}",
+                        workflow.getWorkflowId(),
+                        task.getTaskId());
+                task.setStatus(TaskModel.Status.FAILED);
+                task.setReasonForIncompletion(
+                        "ExclusiveJoin could not determine a task to join on.");
+                LOGGER.debug("Task: {} status is: {}", task.getTaskId(), task.getStatus());
+                return true;
+            }
             if (hasFailures) {
                 task.setReasonForIncompletion(failureReason.toString());
                 task.setStatus(TaskModel.Status.FAILED);
