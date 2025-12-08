@@ -541,7 +541,8 @@ public class WorkflowExecutor {
         workflowStatusListener.onWorkflowCompletedIfEnabled(workflow);
         Monitors.recordWorkflowCompletion(
                 workflow.getWorkflowName(),
-                workflow.getEndTime() - workflow.getCreateTime(),
+                workflow.getEndTime()
+                        - java.util.Optional.ofNullable(workflow.getCreateTime()).orElse(0L),
                 workflow.getOwnerApp());
 
         if (workflow.hasParent()) {

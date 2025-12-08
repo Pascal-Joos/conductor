@@ -297,7 +297,9 @@ public class ExecutionDAOFacade {
         executionDAO.updateWorkflow(workflowModel);
         if (properties.isAsyncIndexingEnabled()) {
             if (workflowModel.getStatus().isTerminal()
-                    && workflowModel.getEndTime() - workflowModel.getCreateTime()
+                    && workflowModel.getEndTime()
+                                    - java.util.Optional.ofNullable(workflowModel.getCreateTime())
+                                            .orElse(0L)
                             < properties.getAsyncUpdateShortRunningWorkflowDuration().toMillis()) {
                 final String workflowId = workflowModel.getWorkflowId();
                 DelayWorkflowUpdate delayWorkflowUpdate = new DelayWorkflowUpdate(workflowId);
