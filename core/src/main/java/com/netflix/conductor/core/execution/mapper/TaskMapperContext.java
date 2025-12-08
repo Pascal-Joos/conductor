@@ -36,14 +36,14 @@ public class TaskMapperContext {
     private final DeciderService deciderService;
 
     private TaskMapperContext(Builder builder) {
-        workflowModel = builder.workflowModel;
+        workflowModel = java.util.Objects.requireNonNull(builder.workflowModel, "workflowModel");
         taskDefinition = builder.taskDefinition;
-        workflowTask = builder.workflowTask;
-        taskInput = builder.taskInput;
+        workflowTask = java.util.Objects.requireNonNull(builder.workflowTask, "workflowTask");
+        taskInput = java.util.Objects.requireNonNull(builder.taskInput, "taskInput");
         retryCount = builder.retryCount;
         retryTaskId = builder.retryTaskId;
-        taskId = builder.taskId;
-        deciderService = builder.deciderService;
+        taskId = java.util.Objects.requireNonNull(builder.taskId, "taskId");
+        deciderService = java.util.Objects.requireNonNull(builder.deciderService, "deciderService");
     }
 
     public static Builder newBuilder() {
@@ -190,14 +190,14 @@ public class TaskMapperContext {
     /** {@code TaskMapperContext} builder static inner class. */
     public static final class Builder {
 
-        private WorkflowModel workflowModel;
+        @Nullable private WorkflowModel workflowModel;
         @Nullable private TaskDef taskDefinition;
-        private WorkflowTask workflowTask;
-        private Map<String, Object> taskInput;
+        @Nullable private WorkflowTask workflowTask;
+        @Nullable private Map<String, Object> taskInput;
         private int retryCount;
         @Nullable private String retryTaskId;
         @Nullable private String taskId;
-        private DeciderService deciderService;
+        @Nullable private DeciderService deciderService;
 
         private Builder() {}
 
