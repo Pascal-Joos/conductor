@@ -48,8 +48,8 @@ public class WorkflowMonitor {
     private final int metadataRefreshInterval;
     private final Set<WorkflowSystemTask> asyncSystemTasks;
 
-    private List<TaskDef> taskDefs;
-    private List<WorkflowDef> workflowDefs;
+    private List<TaskDef> taskDefs = new java.util.ArrayList<>();
+    private List<WorkflowDef> workflowDefs = new java.util.ArrayList<>();
     private int refreshCounter = 0;
 
     public WorkflowMonitor(
