@@ -72,7 +72,7 @@ public class TaskModel {
 
     private Status status;
 
-    @Nullable private String referenceTaskName;
+    private String referenceTaskName = "";
 
     private int retryCount;
 
