@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Netflix, Inc.
+ * Copyright 2020 Netflix, Inc.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,7 +19,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import com.netflix.conductor.core.exception.TerminateWorkflowException;
 import com.netflix.conductor.core.execution.WorkflowExecutor;
@@ -27,36 +26,12 @@ import com.netflix.conductor.core.execution.evaluators.Evaluator;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
-import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_INLINE;
-
-/**
- * @author X-Ultra
- *     <p>Task that enables execute inline script at workflow execution. For example,
- *     <pre>
- * ...
- * {
- *  "tasks": [
- *      {
- *          "name": "INLINE",
- *          "taskReferenceName": "inline_test",
- *          "type": "INLINE",
- *          "inputParameters": {
- *              "input": "${workflow.input}",
- *              "evaluatorType": "javascript"
- *              "expression": "if ($.input.a==1){return {testvalue: true}} else{return {testvalue: false} }"
- *          }
- *      }
- *  ]
- * }
- * ...
- * </pre>
- *     then to use task output, e.g. <code>script_test.output.testvalue</code> {@link Inline} is a
- *     replacement for deprecated {@link Lambda}
- */
-@Component(TASK_TYPE_INLINE)
 public class Inline extends WorkflowSystemTask {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Inline.class);
+
+    public static final String TASK_TYPE_INLINE = "INLINE";
+
     private static final String QUERY_EVALUATOR_TYPE = "evaluatorType";
     private static final String QUERY_EXPRESSION_PARAMETER = "expression";
     public static final String NAME = "INLINE";
@@ -76,9 +51,8 @@ public class Inline extends WorkflowSystemTask {
         String expression = (String) taskInput.get(QUERY_EXPRESSION_PARAMETER);
 
         try {
-            checkEvaluatorType(evaluatorType);
+            Evaluator evaluator = checkEvaluatorType(evaluatorType);
             checkExpression(expression);
-            Evaluator evaluator = evaluators.get(evaluatorType);
             Object evalResult = evaluator.evaluate(expression, taskInput);
             task.addOutput("result", evalResult);
             task.setStatus(TaskModel.Status.COMPLETED);
@@ -102,7 +76,7 @@ public class Inline extends WorkflowSystemTask {
         return true;
     }
 
-    private void checkEvaluatorType(@Nullable String evaluatorType) {
+    private Evaluator checkEvaluatorType(@Nullable String evaluatorType) {
         if (StringUtils.isBlank(evaluatorType)) {
             LOGGER.error("Empty {} in INLINE task. ", QUERY_EVALUATOR_TYPE);
             throw new TerminateWorkflowException(
@@ -110,11 +84,13 @@ public class Inline extends WorkflowSystemTask {
                             + QUERY_EVALUATOR_TYPE
                             + "' in INLINE task's input parameters. A non-empty String value must be provided.");
         }
-        if (evaluators.get(evaluatorType) == null) {
+        Evaluator evaluator = evaluators.get(evaluatorType);
+        if (evaluator == null) {
             LOGGER.error("Evaluator {} for INLINE task not registered", evaluatorType);
             throw new TerminateWorkflowException(
                     "Unknown evaluator '" + evaluatorType + "' in INLINE task.");
         }
+        return evaluator;
     }
 
     private void checkExpression(@Nullable String expression) {
