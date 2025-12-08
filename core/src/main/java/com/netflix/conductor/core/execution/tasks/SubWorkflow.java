@@ -56,7 +56,15 @@ public class SubWorkflow extends WorkflowSystemTask {
             throw new IllegalArgumentException("Missing required input: subWorkflowName");
         }
         String name = subWorkflowNameObj.toString();
-        int version = (int) input.get("subWorkflowVersion");
+        Object subWorkflowVersionObj = input.get("subWorkflowVersion");
+        int version;
+        if (subWorkflowVersionObj == null) {
+            version = 1;
+        } else if (subWorkflowVersionObj instanceof Number) {
+            version = ((Number) subWorkflowVersionObj).intValue();
+        } else {
+            version = Integer.parseInt(subWorkflowVersionObj.toString());
+        }
 
         WorkflowDef workflowDefinition = null;
         if (input.get("subWorkflowDefinition") != null) {
