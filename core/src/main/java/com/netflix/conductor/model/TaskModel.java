@@ -68,7 +68,7 @@ public class TaskModel {
         }
     }
 
-    private String taskType;
+    private String taskType = "";
 
     private Status status = Status.SCHEDULED;
 
