@@ -859,16 +859,19 @@ public class DeciderService {
                         .withTaskId(taskId)
                         .withDeciderService(this)
                         .build();
-
         // For static forks, each branch of the fork creates a join task upon completion for
         // dynamic forks, a join task is created with the fork and also with each branch of the
         // fork.
         // A new task must only be scheduled if a task, with the same reference name is not already
         // in this workflow instance
-        return taskMappers
-                .getOrDefault(type, taskMappers.get(USER_DEFINED.name()))
-                .getMappedTasks(taskMapperContext)
-                .stream()
+        TaskMapper taskMapper = taskMappers.get(type);
+        if (taskMapper == null) {
+            taskMapper = taskMappers.get(USER_DEFINED.name());
+            if (taskMapper == null) {
+                throw new TerminateWorkflowException("No TaskMapper found for type: " + type);
+            }
+        }
+        return taskMapper.getMappedTasks(taskMapperContext).stream()
                 .filter(task -> !tasksInWorkflow.contains(task.getReferenceTaskName()))
                 .collect(Collectors.toList());
     }
