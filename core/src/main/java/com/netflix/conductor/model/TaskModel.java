@@ -443,6 +443,9 @@ public class TaskModel {
     }
 
     public WorkflowTask getWorkflowTask() {
+        if (workflowTask == null) {
+            throw new IllegalStateException("workflowTask is not initialized");
+        }
         return workflowTask;
     }
 
