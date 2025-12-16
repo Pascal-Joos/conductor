@@ -385,8 +385,8 @@ public class WorkflowModel {
         this.ownerApp = ownerApp;
     }
 
-    public long getCreateTime() {
-        return createTime == null ? 0L : createTime;
+    public Long getCreateTime() {
+        return createTime;
     }
 
     public void setCreateTime(Long createTime) {
