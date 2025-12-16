@@ -1,0 +1,9 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    private WorkflowDef workflowDefinition = new WorkflowDef();
+  ```
+    ]]>
+  </code>
+</response>

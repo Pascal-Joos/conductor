@@ -1,0 +1,11 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    public long getCreateTime() {
+        return createTime == null ? 0L : createTime;
+    }
+  ```
+    ]]>
+  </code>
+</response>

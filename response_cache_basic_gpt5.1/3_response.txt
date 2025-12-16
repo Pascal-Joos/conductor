@@ -1,0 +1,49 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    @SuppressWarnings("rawtypes")
+    @Override
+    public List<TaskModel> getMappedTasks(TaskMapperContext taskMapperContext) {
+        LOGGER.debug("TaskMapperContext {} in SubWorkflowTaskMapper", taskMapperContext);
+        WorkflowTask workflowTask = taskMapperContext.getWorkflowTask();
+        WorkflowModel workflowModel = taskMapperContext.getWorkflowModel();
+        String taskId = taskMapperContext.getTaskId();
+        // Check if there are sub workflow parameters, if not throw an exception, cannot initiate a
+        // sub-workflow without workflow params
+        SubWorkflowParams subWorkflowParams = getSubWorkflowParams(workflowTask);
+
+        Map<String, Object> resolvedParams =
+                getSubWorkflowInputParameters(workflowModel, subWorkflowParams);
+
+        Object subWorkflowNameObj = resolvedParams.get("name");
+        if (subWorkflowNameObj == null) {
+            throw new IllegalArgumentException("Missing 'name' in sub-workflow parameters for taskId: " + taskId);
+        }
+        String subWorkflowName = subWorkflowNameObj.toString();
+        Integer subWorkflowVersion = getSubWorkflowVersion(resolvedParams, subWorkflowName);
+
+        Object subWorkflowDefinition = resolvedParams.get("workflowDefinition");
+
+        Map subWorkflowTaskToDomain = null;
+        Object uncheckedTaskToDomain = resolvedParams.get("taskToDomain");
+        if (uncheckedTaskToDomain instanceof Map) {
+            subWorkflowTaskToDomain = (Map) uncheckedTaskToDomain;
+        }
+
+        TaskModel subWorkflowTask = taskMapperContext.createTaskModel();
+        subWorkflowTask.setTaskType(TASK_TYPE_SUB_WORKFLOW);
+        subWorkflowTask.addInput("subWorkflowName", subWorkflowName);
+        subWorkflowTask.addInput("subWorkflowVersion", subWorkflowVersion);
+        subWorkflowTask.addInput("subWorkflowTaskToDomain", subWorkflowTaskToDomain);
+        subWorkflowTask.addInput("subWorkflowDefinition", subWorkflowDefinition);
+        subWorkflowTask.addInput("workflowInput", taskMapperContext.getTaskInput());
+        subWorkflowTask.setStatus(TaskModel.Status.SCHEDULED);
+        subWorkflowTask.setCallbackAfterSeconds(workflowTask.getStartDelay());
+        LOGGER.debug("SubWorkflowTask {} created to be Scheduled", subWorkflowTask);
+        return List.of(subWorkflowTask);
+    }
+  ```
+    ]]>
+  </code>
+</response>

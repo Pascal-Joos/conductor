@@ -1,0 +1,18 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    private TaskMapperContext(Builder builder) {
+        workflowModel = builder.workflowModel;
+        taskDefinition = builder.taskDefinition;
+        workflowTask = builder.workflowTask;
+        taskInput = builder.taskInput;
+        retryCount = builder.retryCount;
+        retryTaskId = builder.retryTaskId;
+        taskId = builder.taskId == null ? "" : builder.taskId;
+        deciderService = builder.deciderService;
+    }
+  ```
+    ]]>
+  </code>
+</response>

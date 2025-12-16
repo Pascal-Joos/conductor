@@ -1,0 +1,24 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    public WorkflowMonitor(
+            MetadataService metadataService,
+            QueueDAO queueDAO,
+            ExecutionDAOFacade executionDAOFacade,
+            @Value("${conductor.workflow-monitor.metadata-refresh-interval:10}")
+                    int metadataRefreshInterval,
+            @Qualifier(ASYNC_SYSTEM_TASKS_QUALIFIER) Set<WorkflowSystemTask> asyncSystemTasks) {
+        this.metadataService = metadataService;
+        this.queueDAO = queueDAO;
+        this.executionDAOFacade = executionDAOFacade;
+        this.metadataRefreshInterval = metadataRefreshInterval;
+        this.asyncSystemTasks = asyncSystemTasks;
+        this.taskDefs = new ArrayList<>();
+        this.workflowDefs = new ArrayList<>();
+        LOGGER.info("{} initialized.", WorkflowMonitor.class.getSimpleName());
+    }
+  ```
+    ]]>
+  </code>
+</response>

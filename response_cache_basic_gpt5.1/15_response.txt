@@ -1,0 +1,66 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    private Object replaceVariables(
+             String paramString,
+            DocumentContext documentContext,
+             String taskId) {
+        if (paramString == null) {
+            return "";
+        }
+        String[] values = paramString.split("(?=(?<!\\$)\\$\\{)|(?<=})");
+        Object[] convertedValues = new Object[values.length];
+        for (int i = 0; i < values.length; i++) {
+            convertedValues[i] = values[i];
+            if (values[i].startsWith("${") && values[i].endsWith("}")) {
+                String paramPath = values[i].substring(2, values[i].length() - 1);
+                // if the paramPath is blank, meaning no value in between ${ and }
+                // like ${}, ${  } etc, set the value to empty string
+                if (StringUtils.isBlank(paramPath)) {
+                    convertedValues[i] = "";
+                    continue;
+                }
+                if (EnvUtils.isEnvironmentVariable(paramPath)) {
+                    String sysValue = EnvUtils.getSystemParametersValue(paramPath, taskId);
+                    if (sysValue != null) {
+                        convertedValues[i] = sysValue;
+                    }
+
+                } else {
+                    try {
+                        convertedValues[i] = documentContext.read(paramPath);
+                    } catch (Exception e) {
+                        LOGGER.warn(
+                                "Error reading documentContext for paramPath: {}. Exception: {}",
+                                paramPath,
+                                e);
+                        convertedValues[i] = null;
+                    }
+                }
+            } else if (values[i].contains("$${")) {
+                convertedValues[i] = values[i].replaceAll("\\$\\$\\{", "\\${");
+            }
+        }
+
+        Object retObj = convertedValues[0];
+        // If the parameter String was "v1 v2 v3" then make sure to stitch it back
+        if (convertedValues.length > 1) {
+            for (int i = 0; i < convertedValues.length; i++) {
+                Object val = convertedValues[i];
+                if (val == null) {
+                    val = "";
+                }
+                if (i == 0) {
+                    retObj = val;
+                } else {
+                    retObj = retObj + "" + val.toString();
+                }
+            }
+        }
+        return retObj;
+    }
+  ```
+    ]]>
+  </code>
+</response>

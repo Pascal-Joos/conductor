@@ -1,0 +1,11 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    public String getTaskId() {
+        return taskId == null ? "" : taskId;
+    }
+  ```
+    ]]>
+  </code>
+</response>
