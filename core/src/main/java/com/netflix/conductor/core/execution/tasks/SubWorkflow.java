@@ -52,9 +52,7 @@ public class SubWorkflow extends WorkflowSystemTask {
     public void start(WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
         Map<String, Object> input = task.getInputData();
         String name = input.get("subWorkflowName").toString();
-        Object subWorkflowVersionObj = input.get("subWorkflowVersion");
-        int version =
-                subWorkflowVersionObj == null ? 0 : ((Number) subWorkflowVersionObj).intValue();
+        int version = (int) input.get("subWorkflowVersion");
 
         WorkflowDef workflowDefinition = null;
         if (input.get("subWorkflowDefinition") != null) {
