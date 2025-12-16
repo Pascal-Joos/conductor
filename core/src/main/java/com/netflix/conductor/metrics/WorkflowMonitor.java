@@ -64,6 +64,8 @@ public class WorkflowMonitor {
         this.executionDAOFacade = executionDAOFacade;
         this.metadataRefreshInterval = metadataRefreshInterval;
         this.asyncSystemTasks = asyncSystemTasks;
+        this.taskDefs = new ArrayList<>();
+        this.workflowDefs = new ArrayList<>();
         LOGGER.info("{} initialized.", WorkflowMonitor.class.getSimpleName());
     }
 
