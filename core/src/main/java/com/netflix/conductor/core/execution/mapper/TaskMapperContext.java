@@ -199,7 +199,12 @@ public class TaskMapperContext {
         @Nullable private String taskId;
         private DeciderService deciderService;
 
-        private Builder() {}
+        private Builder() {
+            this.workflowModel = new WorkflowModel();
+            this.workflowTask = new WorkflowTask();
+            this.taskInput = new HashMap<>();
+            this.deciderService = new DeciderService();
+        }
 
         /**
          * Sets the {@code workflowModel} and returns a reference to this Builder so that the
