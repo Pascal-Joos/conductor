@@ -63,12 +63,7 @@ public class SubWorkflowTaskMapper implements TaskMapper {
         Map<String, Object> resolvedParams =
                 getSubWorkflowInputParameters(workflowModel, subWorkflowParams);
 
-        Object subWorkflowNameObj = resolvedParams.get("name");
-        if (subWorkflowNameObj == null) {
-            throw new IllegalArgumentException(
-                    "Missing 'name' in sub-workflow parameters for taskId: " + taskId);
-        }
-        String subWorkflowName = subWorkflowNameObj.toString();
+        String subWorkflowName = resolvedParams.get("name").toString();
         Integer subWorkflowVersion = getSubWorkflowVersion(resolvedParams, subWorkflowName);
 
         Object subWorkflowDefinition = resolvedParams.get("workflowDefinition");
