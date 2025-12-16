@@ -47,11 +47,6 @@ public class ExclusiveJoin extends WorkflowSystemTask {
         StringBuilder failureReason = new StringBuilder();
         TaskModel.Status taskStatus;
         List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
-        if (joinOn == null || joinOn.isEmpty()) {
-            LOGGER.debug(
-                    "Could not evaluate last tasks output. Verify the task configuration in the workflow definition.");
-            return false;
-        }
         if (task.isLoopOverTask()) {
             // If exclusive join is part of loop over task, wait for specific iteration to get
             // complete
