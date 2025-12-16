@@ -70,7 +70,7 @@ public class TaskModel {
 
     private String taskType;
 
-    private Status status = Status.SCHEDULED;
+    private Status status;
 
     @Nullable private String referenceTaskName;
 
