@@ -47,50 +47,9 @@ public class ExclusiveJoin extends WorkflowSystemTask {
         StringBuilder failureReason = new StringBuilder();
         TaskModel.Status taskStatus;
         List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
-        if (joinOn == null || joinOn.isEmpty()) {
-            List<String> defaultExclusiveJoinTasks =
-                    (List<String>) task.getInputData().get(DEFAULT_EXCLUSIVE_JOIN_TASKS);
-            LOGGER.info(
-                    "Could not perform exclusive on Join Task(s). Performing now on default exclusive join task(s) {}, workflow: {}",
-                    defaultExclusiveJoinTasks,
-                    workflow.getWorkflowId());
-            if (defaultExclusiveJoinTasks != null && !defaultExclusiveJoinTasks.isEmpty()) {
-                TaskModel exclusiveTask = null;
-                for (String defaultExclusiveJoinTask : defaultExclusiveJoinTasks) {
-                    exclusiveTask = workflow.getTaskByRefName(defaultExclusiveJoinTask);
-                    if (exclusiveTask == null
-                            || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
-                        LOGGER.debug(
-                                "The task {} is either not scheduled or skipped.",
-                                defaultExclusiveJoinTask);
-                        continue;
-                    }
-                    taskStatus = exclusiveTask.getStatus();
-                    foundExlusiveJoinOnTask = taskStatus.isTerminal();
-                    hasFailures = !taskStatus.isSuccessful();
-                    if (hasFailures) {
-                        failureReason.append(exclusiveTask.getReasonForIncompletion()).append(" ");
-                    }
-                    break;
-                }
-                if (foundExlusiveJoinOnTask || hasFailures) {
-                    if (hasFailures) {
-                        task.setReasonForIncompletion(failureReason.toString());
-                        task.setStatus(TaskModel.Status.FAILED);
-                    } else {
-                        task.setOutputData(exclusiveTask.getOutputData());
-                        task.setStatus(TaskModel.Status.COMPLETED);
-                    }
-                    LOGGER.debug("Task: {} status is: {}", task.getTaskId(), task.getStatus());
-                    return true;
-                }
-            } else {
-                LOGGER.debug(
-                        "Could not evaluate last tasks output. Verify the task configuration in the workflow definition.");
-            }
-            return false;
-        }
         if (task.isLoopOverTask()) {
+            // If exclusive join is part of loop over task, wait for specific iteration to get
+            // complete
             joinOn =
                     joinOn.stream()
                             .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
@@ -123,6 +82,7 @@ public class ExclusiveJoin extends WorkflowSystemTask {
                     workflow.getWorkflowId());
             if (defaultExclusiveJoinTasks != null && !defaultExclusiveJoinTasks.isEmpty()) {
                 for (String defaultExclusiveJoinTask : defaultExclusiveJoinTasks) {
+                    // Pick the first task that we should join on and break.
                     exclusiveTask = workflow.getTaskByRefName(defaultExclusiveJoinTask);
                     if (exclusiveTask == null
                             || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
