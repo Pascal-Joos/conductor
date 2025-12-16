@@ -370,7 +370,7 @@ public class TaskModel {
     }
 
     public String getTaskId() {
-        return taskId == null ? "" : taskId;
+        return taskId;
     }
 
     public void setTaskId(String taskId) {
