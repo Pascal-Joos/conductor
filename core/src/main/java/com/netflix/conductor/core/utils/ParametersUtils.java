@@ -225,9 +225,6 @@ public class ParametersUtils {
             @Nullable String paramString,
             DocumentContext documentContext,
             @Nullable String taskId) {
-        if (paramString == null) {
-            return "";
-        }
         String[] values = paramString.split("(?=(?<!\\$)\\$\\{)|(?<=})");
         Object[] convertedValues = new Object[values.length];
         for (int i = 0; i < values.length; i++) {
