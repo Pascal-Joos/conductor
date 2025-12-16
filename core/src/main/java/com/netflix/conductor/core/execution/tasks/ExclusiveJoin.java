@@ -114,7 +114,7 @@ public class ExclusiveJoin extends WorkflowSystemTask {
             if (hasFailures) {
                 task.setReasonForIncompletion(failureReason.toString());
                 task.setStatus(TaskModel.Status.FAILED);
-            } else {
+            } else if (exclusiveTask != null) {
                 task.setOutputData(exclusiveTask.getOutputData());
                 task.setStatus(TaskModel.Status.COMPLETED);
             }
