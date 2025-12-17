@@ -865,10 +865,12 @@ public class DeciderService {
         // fork.
         // A new task must only be scheduled if a task, with the same reference name is not already
         // in this workflow instance
-        return taskMappers
-                .getOrDefault(type, taskMappers.get(USER_DEFINED.name()))
-                .getMappedTasks(taskMapperContext)
-                .stream()
+        TaskMapper taskMapper =
+                taskMappers.getOrDefault(type, taskMappers.get(USER_DEFINED.name()));
+        if (taskMapper == null) {
+            return Collections.emptyList();
+        }
+        return taskMapper.getMappedTasks(taskMapperContext).stream()
                 .filter(task -> !tasksInWorkflow.contains(task.getReferenceTaskName()))
                 .collect(Collectors.toList());
     }
