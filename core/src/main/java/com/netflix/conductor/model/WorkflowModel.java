@@ -83,7 +83,7 @@ public class WorkflowModel {
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Set<String> failedTaskNames = new HashSet<>();
 
-    private WorkflowDef workflowDefinition;
+    private WorkflowDef workflowDefinition = new WorkflowDef();
 
     @Nullable private String externalInputPayloadStoragePath;
 
