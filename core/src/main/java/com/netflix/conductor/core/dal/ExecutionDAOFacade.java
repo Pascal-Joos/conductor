@@ -52,7 +52,6 @@ import com.netflix.conductor.model.WorkflowModel;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.ucr.cs.riple.annotator.util.Nullability;
 
 import static com.netflix.conductor.core.utils.Utils.DECIDER_QUEUE;
 
@@ -512,7 +511,7 @@ public class ExecutionDAOFacade {
     }
 
     public void removeTask(String taskId) {
-        executionDAO.removeTask(Nullability.castToNonnull(taskId));
+        executionDAO.removeTask(taskId);
     }
 
     public void extendLease(TaskModel taskModel) {
