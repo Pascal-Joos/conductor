@@ -385,6 +385,7 @@ public class WorkflowModel {
         this.ownerApp = ownerApp;
     }
 
+    @Nullable
     public Long getCreateTime() {
         return createTime;
     }
