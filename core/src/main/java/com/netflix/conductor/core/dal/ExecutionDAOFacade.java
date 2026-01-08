@@ -52,7 +52,6 @@ import com.netflix.conductor.model.WorkflowModel;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.ucr.cs.riple.annotator.util.Nullability;
 
 import static com.netflix.conductor.core.utils.Utils.DECIDER_QUEUE;
 
@@ -298,8 +297,7 @@ public class ExecutionDAOFacade {
         executionDAO.updateWorkflow(workflowModel);
         if (properties.isAsyncIndexingEnabled()) {
             if (workflowModel.getStatus().isTerminal()
-                    && workflowModel.getEndTime()
-                                    - Nullability.castToNonnull(workflowModel.getCreateTime())
+                    && workflowModel.getEndTime() - workflowModel.getCreateTime()
                             < properties.getAsyncUpdateShortRunningWorkflowDuration().toMillis()) {
                 final String workflowId = workflowModel.getWorkflowId();
                 DelayWorkflowUpdate delayWorkflowUpdate = new DelayWorkflowUpdate(workflowId);

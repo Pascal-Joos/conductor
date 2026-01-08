@@ -46,8 +46,6 @@ import com.netflix.conductor.metrics.Monitors;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
-import edu.ucr.cs.riple.annotator.util.Nullability;
-
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TERMINATE;
 import static com.netflix.conductor.common.metadata.tasks.TaskType.USER_DEFINED;
 import static com.netflix.conductor.model.TaskModel.Status.*;
@@ -635,7 +633,7 @@ public class DeciderService {
         long elapsedTime =
                 workflow.getLastRetriedTime() > 0
                         ? now - workflow.getLastRetriedTime()
-                        : now - Nullability.castToNonnull(workflow.getCreateTime());
+                        : now - workflow.getCreateTime();
 
         if (elapsedTime < timeout) {
             return;
