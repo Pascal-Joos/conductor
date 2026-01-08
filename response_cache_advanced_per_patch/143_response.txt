@@ -1,0 +1,34 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private Optional<TaskModel> findChangedSubWorkflowTask(WorkflowModel workflow) {
+        WorkflowDef workflowDef =
+                Optional.ofNullable(workflow.getWorkflowDefinition())
+                        .orElseGet(
+                                () ->
+                                        metadataDAO
+                                                .getWorkflowDef(
+                                                        workflow.getWorkflowName(),
+                                                        workflow.getWorkflowVersion())
+                                                .orElseThrow(
+                                                        () ->
+                                                                new TransientException(
+                                                                        "Workflow Definition is not found")));
+        if (workflowDef.containsType(TaskType.TASK_TYPE_SUB_WORKFLOW)
+                || workflow.getWorkflowDefinition()
+                        .containsType(TaskType.TASK_TYPE_FORK_JOIN_DYNAMIC)) {
+            return workflow.getTasks().stream()
+                    .filter(
+                            t ->
+                                    TaskType.TASK_TYPE_SUB_WORKFLOW.equals(t.getTaskType())
+                                            && t.isSubworkflowChanged()
+                                            && !t.isRetried())
+                    .findFirst();
+        }
+        return Optional.empty();
+}
+  ```
+    ]]>
+  </code>
+</response>

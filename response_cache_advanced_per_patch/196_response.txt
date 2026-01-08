@@ -1,0 +1,7 @@
+<response>
+  <success>false</success>
+  <methods>
+    <method>getWorkflow</method>
+    <method>getWorkflowDefinition</method>
+  </methods>
+</response>

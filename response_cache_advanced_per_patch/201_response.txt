@@ -1,0 +1,45 @@
+<response>
+  <reason><![CDATA[
+At this call site the receiver is a `WorkflowModel` instance referred to as `workflow` (e.g., in `ForkJoinTaskMapper`, `ForkJoinDynamicTaskMapper`, `DeciderService`, `WorkflowExecutor`, `WorkflowSweeper`, etc.), and the method invoked is:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowDefinition;
+}
+```
+
+There is no guarantee anywhere in the shown code that `workflowDefinition` is always non‑null for every `WorkflowModel` instance:
+
+- `WorkflowModel` is obtained from persistence (e.g., `executionDAOFacade.getWorkflowModel(...)`) and nothing in the provided code enforces that the internal field `workflowDefinition` is populated at load time.
+- Multiple call sites explicitly treat `workflow.getWorkflowDefinition()` as potentially null:
+  - `MetadataMapperService.populateWorkflowWithDefinitions` does:
+    ```java
+    WorkflowDef workflowDefinition =
+        Optional.ofNullable(workflow.getWorkflowDefinition())
+            .orElseGet(() -> { ... lookupForWorkflowDefinition(...); ... });
+    ```
+    This shows that `getWorkflowDefinition()` can be null *before* this method is called and that this method is used to populate it.
+  - `DeciderService.checkWorkflowTimeout` safely handles null:
+    ```java
+    WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+    if (workflowDef == null) {
+        LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+        return;
+    }
+    ```
+    Again, this is explicit acknowledgement that `getWorkflowDefinition()` may return null.
+  - `WorkflowStatusListener.onWorkflowCompletedIfEnabled` checks for null:
+    ```java
+    WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+    if (workflowDef != null && workflowDef.isWorkflowStatusListenerEnabled()) {
+        onWorkflowCompleted(workflow);
+    }
+    ```
+
+- Other code paths do *not* guard against null and can throw NPE if `workflowDefinition` is missing (e.g., many direct uses of `workflow.getWorkflowDefinition().getSchemaVersion()` or `.getNextTask(...)`). The fact that they can NPE does not imply that `getWorkflowDefinition()` is non‑null; it only means those paths assume it but do not enforce it.
+
+At this specific call site `workflow.getWorkflowDefinition()` there is no preceding invariant or mandatory population step (like a guaranteed call to `populateWorkflowWithDefinitions(workflow)` on all workflows) that would prove `workflowDefinition` is non‑null. Since some code explicitly handles it as nullable and no global guarantee is shown, we must conclude that for a given `workflow` instance, `workflowDefinition` may be null at the time of the call.
+
+Therefore, the method can return null for this invocation.]]></reason>
+  <value>YES</value>
+</response>

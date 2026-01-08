@@ -1,0 +1,158 @@
+```xml
+<response>
+    <reason><![CDATA[
+We need to determine whether the variable `exclusiveTask` can be null at the point where it is used:
+
+    task.setOutputData(exclusiveTask.getOutputData());
+
+This line is executed only inside this conditional:
+
+    if (foundExlusiveJoinOnTask || hasFailures) {
+        if (hasFailures) {
+            ...
+        } else {
+            task.setOutputData(exclusiveTask.getOutputData());
+            task.setStatus(TaskModel.Status.COMPLETED);
+        }
+        ...
+    }
+
+So we care about the branch where:
+- `foundExlusiveJoinOnTask || hasFailures` is true, and
+- `hasFailures` is false (because otherwise we go into the `if (hasFailures)` block and do NOT access `exclusiveTask`).
+
+Therefore, the line in question executes exactly when:
+
+    !hasFailures && foundExlusiveJoinOnTask
+
+Now examine where `exclusiveTask` and `foundExlusiveJoinOnTask` are set.
+
+1. Initialization:
+
+    TaskModel exclusiveTask = null;
+    boolean foundExlusiveJoinOnTask = false;
+
+2. First loop (primary `joinOn` tasks):
+
+    for (String joinOnRef : joinOn) {
+        exclusiveTask = workflow.getTaskByRefName(joinOnRef);
+        if (exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+            continue;
+        }
+        taskStatus = exclusiveTask.getStatus();
+        foundExlusiveJoinOnTask = taskStatus.isTerminal();
+        hasFailures = !taskStatus.isSuccessful();
+        ...
+        break;
+    }
+
+In this loop:
+- If `exclusiveTask` is null or SKIPPED, we `continue`, so we do NOT set `foundExlusiveJoinOnTask` for that iteration, and we do not break.
+- The only way to reach `break` is with `exclusiveTask != null` and `exclusiveTask.getStatus() != SKIPPED`. Thus:
+  - On the path where we exit the loop via this `break`, `exclusiveTask` is guaranteed non-null.
+  - `foundExlusiveJoinOnTask` is set from `taskStatus.isTerminal()` where `taskStatus = exclusiveTask.getStatus()`.
+  - `hasFailures` is set from `!taskStatus.isSuccessful()`.
+
+If we never hit that `break` (e.g., all tasks are null or SKIPPED), then `exclusiveTask` remains whatever it was last assigned. Two possibilities:
+- If no iteration ever assigned it (e.g., `joinOn` empty, or loop never entered), then it remains `null`.
+- If some iteration assigned a non-null but SKIPPED task, `exclusiveTask` will hold that SKIPPED task, but note: in that case, we always `continue` immediately after the null/SKIPPED check, never updating `foundExlusiveJoinOnTask` or `hasFailures` on that iteration. So `foundExlusiveJoinOnTask` could still be `false`.
+
+Crucially, if no suitable task is found in this first loop, then at loop exit we can have:
+
+    exclusiveTask == null (or SKIPPED)
+    foundExlusiveJoinOnTask == false
+    hasFailures == false  (still default)
+
+3. Fallback block (defaultExclusiveJoinTasks):
+
+This block runs only if:
+
+    if (!foundExlusiveJoinOnTask) {
+        ...
+    }
+
+Inside it:
+
+    if (defaultExclusiveJoinTasks != null && !defaultExclusiveJoinTasks.isEmpty()) {
+        for (String defaultExclusiveJoinTask : defaultExclusiveJoinTasks) {
+            exclusiveTask = workflow.getTaskByRefName(defaultExclusiveJoinTask);
+            if (exclusiveTask == null
+                    || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+                continue;
+            }
+
+            taskStatus = exclusiveTask.getStatus();
+            foundExlusiveJoinOnTask = taskStatus.isTerminal();
+            hasFailures = !taskStatus.isSuccessful();
+            ...
+            break;
+        }
+    } else {
+        LOGGER.debug("Could not evaluate last tasks output. Verify the task configuration in the workflow definition.");
+    }
+
+Again, the same pattern:
+- To reach the inner `break`, `exclusiveTask` must be non-null and non-SKIPPED.
+- If we only hit `continue` (null or SKIPPED each time), we leave the loop without updating `foundExlusiveJoinOnTask` or `hasFailures` from their previous values (which, at entry to this block, are `foundExlusiveJoinOnTask == false`, `hasFailures ==` whatever came from the first loop, possibly still `false`).
+- If `defaultExclusiveJoinTasks` is null or empty, the loop is skipped entirely and `exclusiveTask` is not changed.
+
+So after this fallback block, there are these main scenarios:
+
+A. A valid task was found in either the first or second loop:
+   - `exclusiveTask` is non-null and non-SKIPPED.
+   - `foundExlusiveJoinOnTask` is set from that task’s `isTerminal()`.
+   - `hasFailures` is set from that task’s `!isSuccessful()`.
+
+   If this task is terminal and successful:
+   - `foundExlusiveJoinOnTask == true`
+   - `hasFailures == false`
+   - `exclusiveTask` is guaranteed non-null at the join.
+
+   This is the “good” path; here `exclusiveTask` cannot be null at the `setOutputData` call.
+
+B. No valid task was found in either loop:
+   - `exclusiveTask` is either:
+     - still `null`, or
+     - possibly a SKIPPED task from the last assignment before a `continue` (depending on how `workflow.getTaskByRefName` behaves and loop iterations).
+   - `foundExlusiveJoinOnTask` remains `false` (it is only ever set when we have a non-null, non-SKIPPED task and then we immediately break).
+   - `hasFailures` is either:
+     - still `false` (if we never found any non-SKIPPED task), or
+     - possibly `true` if an earlier valid task set it (in which case we would also have `foundExlusiveJoinOnTask` determined and broken out; but that case falls under scenario A).
+
+In scenario B, after all the search logic, we have:
+
+    foundExlusiveJoinOnTask == false
+    hasFailures == false
+    exclusiveTask == null  (very plausible) or SKIPPED
+
+Now the final condition:
+
+    if (foundExlusiveJoinOnTask || hasFailures) { ... }
+
+In scenario B, this condition is:
+
+    if (false || false) => if (false)
+
+Thus, the body does NOT execute; we never reach:
+
+    task.setOutputData(exclusiveTask.getOutputData());
+
+So under the present control flow, the line that dereferences `exclusiveTask` is only executed when:
+
+- A valid (non-null, non-SKIPPED) task was found, and
+- That task was terminal and successful (so `foundExlusiveJoinOnTask == true && hasFailures == false`).
+
+That implies `exclusiveTask` is non-null whenever we dereference it.
+
+Edge considerations that do NOT change the conclusion:
+
+- `joinOn` might be null or empty: then no loop iterations run; `exclusiveTask` stays null; `foundExlusiveJoinOnTask` stays false. But then the final `if (foundExlusiveJoinOnTask || hasFailures)` is false, so the dereference still never occurs.
+- `defaultExclusiveJoinTasks` may be null/empty or have only null/SKIPPED tasks: same effect; the final if condition ends up false when `exclusiveTask` is null.
+- `workflow.getTaskByRefName` contract: Even if it returns null often, we guard with `if (exclusiveTask == null || exclusiveTask.getStatus() == SKIPPED) continue;` and only assign `foundExlusiveJoinOnTask` and `hasFailures` (and then break) when `exclusiveTask` is non-null and not SKIPPED.
+
+Because the dereference is strictly guarded by these flags, and those flags are only set to trigger the dereference in code paths where `exclusiveTask` was just confirmed non-null, `exclusiveTask` cannot be null when `exclusiveTask.getOutputData()` is invoked.
+
+]]></reason>
+    <value>NO</value>
+</response>
+```

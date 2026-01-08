@@ -1,0 +1,69 @@
+<response>
+  <reason><![CDATA[
+The call site in question is `t.getTaskType()` where `t` is a `TaskModel` instance being iterated in:
+
+```java
+for (TaskModel taskModel : workflowModel.getTasks()) {
+    if (taskModel.getStatus() == Status.IN_PROGRESS) {
+        if (taskModel.getTaskType().equals(TaskType.TASK_TYPE_WAIT)
+                || taskModel.getTaskType().equals(TaskType.TASK_TYPE_HUMAN)) {
+            ...
+```
+
+The method itself is:
+
+```java
+public String getTaskType() {
+    return taskType;
+}
+```
+
+There is no non‑null guarantee on the `taskType` field in `TaskModel` anywhere in the provided code. In fact, there are multiple places where new `TaskModel` instances are created and `taskType` is either:
+
+- Explicitly set, e.g.:
+  - `humanTask.setTaskType(TASK_TYPE_HUMAN);`
+  - `waitTask.setTaskType(TASK_TYPE_WAIT);`
+  - `eventTask.setTaskType(TASK_TYPE_EVENT);`
+  - `inlineTask.setTaskType(TaskType.TASK_TYPE_INLINE);`
+  - `lambdaTask.setTaskType(TaskType.TASK_TYPE_LAMBDA);`
+  - `task.setTaskType(TASK_TYPE_TERMINATE);`
+  - `doWhileTask.setTaskType(TaskType.TASK_TYPE_DO_WHILE);`
+  - `humanTask`, `waitTask`, `eventTask`, etc., are thus safe.
+
+- Or *not* set at all in several mappers:
+  - `KafkaPublishTaskMapper`:
+    ```java
+    TaskModel kafkaPublishTask = taskMapperContext.createTaskModel();
+    // taskType is never set here
+    ```
+  - `HTTPTaskMapper`:
+    ```java
+    TaskModel httpTask = taskMapperContext.createTaskModel();
+    // taskType is never set here
+    ```
+  - `UserDefinedTaskMapper`:
+    ```java
+    TaskModel userDefinedTask = taskMapperContext.createTaskModel();
+    // taskType is never set here
+    ```
+  - `JsonJQTransformTaskMapper`:
+    ```java
+    TaskModel jsonJQTransformTask = taskMapperContext.createTaskModel();
+    // taskType is never set here
+    ```
+
+For those latter tasks, unless `taskMapperContext.createTaskModel()` (not provided) sets `taskType` internally, these `TaskModel` instances can have `taskType == null`. Such tasks are then added to workflows and later appear in `workflowModel.getTasks()`; they are processed broadly throughout the code (e.g., in `DeciderService`, `WorkflowExecutor`, `WorkflowSweeper`, etc.) under the same `TaskModel` type without any invariant that `taskType` is always non-null.
+
+Therefore, at the specific call site inside `WorkflowSweeper.unack`:
+
+```java
+if (taskModel.getTaskType().equals(TaskType.TASK_TYPE_WAIT)
+        || taskModel.getTaskType().equals(TaskType.TASK_TYPE_HUMAN)) {
+```
+
+`taskModel.getTaskType()` can be `null` for a task created by one of the mappers that never sets `taskType` (assuming `createTaskModel()` does not always populate it). In that case, the method `getTaskType()` returns `null`, and the subsequent `.equals(...)` call will actually throw a `NullPointerException`, which confirms that a `null` value is possible at this call site.
+
+Thus, from the method body and usages, there is no guarantee that `taskType` is non-null for all `TaskModel` instances reaching `unack`, so `getTaskType()` can indeed return null here.
+  ]]></reason>
+  <value>YES</value>
+</response>

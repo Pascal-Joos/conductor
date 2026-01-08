@@ -1,0 +1,41 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+@Override
+    public boolean execute(
+            WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
+        Map<String, Object> taskInput = task.getInputData();
+        String evaluatorType = (String) taskInput.get(QUERY_EVALUATOR_TYPE);
+        String expression = (String) taskInput.get(QUERY_EXPRESSION_PARAMETER);
+
+        try {
+            checkEvaluatorType(evaluatorType);
+            checkExpression(expression);
+            Evaluator evaluator = evaluators.get(evaluatorType);
+            Object evalResult = Nullability.castToNonnull(evaluator).evaluate(expression, taskInput);
+            task.addOutput("result", evalResult);
+            task.setStatus(TaskModel.Status.COMPLETED);
+        } catch (Exception e) {
+            String errorMessage = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            LOGGER.error(
+                    "Failed to execute Inline Task: {} in workflow: {}",
+                    task.getTaskId(),
+                    workflow.getWorkflowId(),
+                    e);
+            // TerminateWorkflowException is thrown when the script evaluation fails
+            // Retry will result in the same error, so FAILED_WITH_TERMINAL_ERROR status is used.
+            task.setStatus(
+                    e instanceof TerminateWorkflowException
+                            ? TaskModel.Status.FAILED_WITH_TERMINAL_ERROR
+                            : TaskModel.Status.FAILED);
+            task.setReasonForIncompletion(errorMessage);
+            task.addOutput("error", errorMessage);
+        }
+
+        return true;
+}
+  ```
+    ]]>
+  </code>
+</response>

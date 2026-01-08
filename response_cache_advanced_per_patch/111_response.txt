@@ -1,0 +1,71 @@
+<response>
+  <reason><![CDATA[
+At the call site in `Join.execute`:
+
+```java
+TaskModel forkedTask = workflow.getTaskByRefName(joinOnRef);
+if (forkedTask == null) {
+    // Task is not even scheduled yet
+    allDone = false;
+    break;
+}
+TaskModel.Status taskStatus = forkedTask.getStatus();
+hasFailures = !taskStatus.isSuccessful() && !forkedTask.getWorkflowTask().isOptional();
+```
+
+the object on which `getWorkflowTask()` is invoked (`forkedTask`) is guaranteed non-null by the preceding null check.
+
+However, the *field* returned by `getWorkflowTask()` is not guaranteed to be non-null anywhere in the provided code:
+
+- `TaskModel.getWorkflowTask()` is a simple accessor:
+  ```java
+  public WorkflowTask getWorkflowTask() {
+      return workflowTask;
+  }
+  ```
+  with no non-null invariant or initialization shown.
+
+- Multiple other call sites defensively handle `getWorkflowTask()` as potentially null:
+  - `WorkflowExecutor.getTaskDefinition`:
+    ```java
+    Optional.ofNullable(task.getWorkflowTask())
+      .map(WorkflowTask::getName)
+      ...
+    ```
+  - `WorkflowExecutor.scheduleNextIteration`:
+    ```java
+    WorkflowTask workflowTask =
+        Optional.ofNullable(loopTask.getWorkflowTask())
+            .orElseGet(() -> workflow.getWorkflowDefinition()
+                                     .getTaskByRefName(loopTask.getReferenceTaskName()));
+    if (workflowTask == null || workflowTask.getLoopOver() == null || ...) {
+        return;
+    }
+    ```
+  - `DeciderService.decide`:
+    ```java
+    WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+    if (workflowTask == null) {
+        workflowTask =
+            workflow.getWorkflowDefinition()
+                    .getTaskByRefName(pendingTask.getReferenceTaskName());
+    }
+    ```
+  - `DoWhile` and other locations use `Optional.ofNullable(task.getWorkflowTask())`, again indicating that `workflowTask` may legitimately be null.
+
+These usages clearly show the library authors expect `TaskModel.workflowTask` sometimes not to be set and thus to be null when `getWorkflowTask()` is called. There is no code in the snippet that enforces that every `TaskModel` retrieved via `workflow.getTaskByRefName(...)` must have a non-null `workflowTask`. In fact, `WorkflowExecutor.getTask` even returns tasks without populating their `workflowTask` when it is null:
+
+```java
+return Optional.ofNullable(executionDAOFacade.getTaskModel(taskId))
+        .map(task -> {
+            if (task.getWorkflowTask() != null) {
+                return metadataMapperService.populateTaskWithDefinition(task);
+            }
+            return task;
+        })
+        .orElse(null);
+```
+
+So at the specific call site `forkedTask.getWorkflowTask()` inside `Join.execute`, the `workflowTask` field may still be null, and no guard exists there to prevent that. Therefore the return value of `forkedTask.getWorkflowTask()` at this site can be null.]]></reason>
+  <value>YES</value>
+</response>

@@ -1,0 +1,61 @@
+<response>
+  <reason><![CDATA[
+At the examined call site:
+
+```java
+runningTask
+    .getReferenceTaskName()
+```
+
+`runningTask` is the stream element of:
+
+```java
+workflowModel.getTasks().stream()
+    .filter(
+        runningTask ->
+            runningTask.getStatus().equals(TaskModel.Status.IN_PROGRESS)
+                || runningTask.getStatus().isTerminal())
+    .map(TaskModel::getReferenceTaskName)
+    .filter(
+        refTaskName ->
+            refTaskName.equals(dynForkTask.getTaskReferenceName()))
+    .findAny();
+```
+
+So the value whose null‑possibility we must assess is the result of `TaskModel::getReferenceTaskName` when invoked on each `runningTask` drawn from `workflowModel.getTasks()`.
+
+From the provided code, there is no guarantee that `referenceTaskName` is non‑null for every `TaskModel` in `workflowModel.getTasks()`. In fact, elsewhere in `WorkflowModel.getTaskByRefName` we see:
+
+```java
+for (TaskModel task : tasks) {
+    if (task.getReferenceTaskName() == null) {
+        throw new RuntimeException(
+            "Task " + task.getTaskDefName()
+            + ", seq=" + task.getSeq()
+            + " does not have reference name specified.");
+    }
+    ...
+}
+```
+
+This explicit check and error text show that tasks with a null `referenceTaskName` are considered possible (and erroneous) states; the code is defending against that by throwing at the point it needs a non‑null reference name. That defense is *not* present in the stream where our call site appears.
+
+Here, in `ForkJoinDynamicTaskMapper.getMappedTasks`, the stream does:
+
+1. `workflowModel.getTasks().stream()` – iterates over all tasks; no prior filtering on reference name.
+2. `.filter(runningTask -> runningTask.getStatus().equals(IN_PROGRESS) || runningTask.getStatus().isTerminal())` – filters only on status, not on `referenceTaskName`.
+3. `.map(TaskModel::getReferenceTaskName)` – directly calls `getReferenceTaskName()` on each such `runningTask`.
+
+If any `TaskModel` in `workflowModel.getTasks()` with `IN_PROGRESS` or terminal status has a null `referenceTaskName`, then `runningTask.getReferenceTaskName()` will evaluate to null at this site. That null then flows to the stream as an element, and only *later* is there a filter:
+
+```java
+.filter(refTaskName -> refTaskName.equals(dynForkTask.getTaskReferenceName()))
+```
+
+This filter itself even assumes `refTaskName` is non‑null (calling `.equals(...)` on it), which would throw a `NullPointerException` if `refTaskName` is null — further evidence that the code is not guarding against nulls here, but that does not change the fact that `getReferenceTaskName()` can return null.
+
+No constructor or setter for `TaskModel` was provided that would prove `referenceTaskName` is always initialized to non‑null before tasks enter `workflowModel.getTasks()`. On the contrary, the presence of runtime checks for null `referenceTaskName` in other methods implies it can indeed be null in general.
+
+Therefore, for this specific call site, there is a real code path where `referenceTaskName` is `null`, and thus `runningTask.getReferenceTaskName()` can return null.]]></reason>
+  <value>YES</value>
+</response>

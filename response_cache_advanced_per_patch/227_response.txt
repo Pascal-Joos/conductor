@@ -1,0 +1,48 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private boolean isJSONJQTransformTaskValid(
+                WorkflowTask workflowTask, ConstraintValidatorContext context) {
+            boolean valid = true;
+            boolean isInputParameterSet = false;
+            boolean isInputTemplateSet = false;
+
+            // Either queryExpression in WorkflowTask inputParam should be set or in inputTemplate
+            // Taskdef should be set
+            if (workflowTask.getInputParameters() != null
+                    && workflowTask.getInputParameters().containsKey("queryExpression")) {
+                isInputParameterSet = true;
+            }
+
+            MetadataDAO metadataDAO = ValidationContext.getMetadataDAO();
+            TaskDef taskDef =
+                    Optional.ofNullable(workflowTask.getTaskDefinition())
+                            .orElse(
+                                    metadataDAO == null
+                                            ? null
+                                            : metadataDAO.getTaskDef(workflowTask.getName()));
+
+            if (taskDef != null
+                    && taskDef.getInputTemplate() != null
+                    && taskDef.getInputTemplate().containsKey("queryExpression")) {
+                isInputTemplateSet = true;
+            }
+
+            if (!(isInputParameterSet || isInputTemplateSet)) {
+                String message =
+                        String.format(
+                                PARAM_REQUIRED_STRING_FORMAT,
+                                "inputParameters.queryExpression",
+                                TaskType.JSON_JQ_TRANSFORM,
+                                workflowTask.getName());
+                context.buildConstraintViolationWithTemplate(message).addConstraintViolation();
+                valid = false;
+            }
+
+            return valid;
+}
+  ```
+    ]]>
+  </code>
+</response>

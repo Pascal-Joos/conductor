@@ -1,0 +1,58 @@
+<response>
+  <reason><![CDATA[
+At the call site in question, `workflow` is an instance of `WorkflowModel`, and `getWorkflowDefinition()` simply returns the field `workflowDefinition` with no additional checks or initialization:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowDefinition;
+}
+```
+
+Across the provided call chain, there are *multiple* usages of `workflow.getWorkflowDefinition()` that explicitly handle the case where it can be `null`:
+
+1. In `MetadataMapperService.populateWorkflowWithDefinitions`:
+   ```java
+   WorkflowDef workflowDefinition =
+           Optional.ofNullable(workflow.getWorkflowDefinition())
+                   .orElseGet(() -> {
+                       WorkflowDef wd = lookupForWorkflowDefinition(...);
+                       workflow.setWorkflowDefinition(wd);
+                       return wd;
+                   });
+   ```
+   This code would be unnecessary if `getWorkflowDefinition()` could never be null; it explicitly assumes it *may* be null.
+
+2. In several places, the code uses `Optional.ofNullable(workflow.getWorkflowDefinition()).orElseThrow(...)` to guarantee a non-null definition *only after* this wrapping:
+   ```java
+   WorkflowDef workflowDefinition =
+           Optional.ofNullable(workflow.getWorkflowDefinition())
+                   .orElseThrow(() -> new TerminateWorkflowException("Missing workflow definition ..."));
+   ```
+   The presence of these `orElseThrow` constructs shows that callers do not consider `getWorkflowDefinition()` intrinsically non-null; they must enforce non-nullness themselves.
+
+3. In other locations, it is used without such guards, and the code explicitly checks for null:
+   ```java
+   WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+   if (workflowDef == null) {
+       LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+       return;
+   }
+   ```
+   Again, this confirms that `getWorkflowDefinition()` may legitimately return null.
+
+4. In `WorkflowStatusListener.onWorkflowCompletedIfEnabled`, the pattern is:
+   ```java
+   WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+   if (workflowDef != null && workflowDef.isWorkflowStatusListenerEnabled()) {
+       onWorkflowCompleted(workflow);
+   }
+   ```
+   This is a direct null-check on the result of `workflow.getWorkflowDefinition()`.
+
+Because the getter contains no defensive logic and simply returns the backing field, and because other parts of the codebase both (a) treat it as potentially null and (b) explicitly populate it only in some flows (for instance via `metadataMapperService.populateWorkflowWithDefinitions(workflow)` or by setting it in `restart` with `workflow.setWorkflowDefinition(workflowDef)`), there is no global guarantee that `workflowDefinition` is always initialized for all `WorkflowModel` instances at all times.
+
+Therefore, at the specific call site `workflow.getWorkflowDefinition()`, unless that particular code path has previously enforced a non-null workflow definition (e.g., using `Optional.ofNullable(...).orElseThrow(...)` or a prior setter), the method itself is capable of returning null. The provided snippets do not establish a universal invariant that `workflowDefinition` is non-null before every such call; on the contrary, they show the opposite by guarding for null in multiple methods.
+
+Thus, the method can return null at this call site.]]></reason>
+  <value>YES</value>
+</response>

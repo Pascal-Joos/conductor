@@ -1,0 +1,59 @@
+<response>
+  <reason><![CDATA[
+At this call site, `workflow` is an instance of `WorkflowModel`, and `getWorkflowDefinition()` simply returns the field `workflowDefinition` with no additional checks:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowDefinition;
+}
+```
+
+Across the provided call chain, there is no global guarantee that `workflowDefinition` is non‑null on every `WorkflowModel`. In fact, several methods explicitly handle or expect it to be possibly null:
+
+- `MetadataMapperService.populateWorkflowWithDefinitions`:
+  ```java
+  WorkflowDef workflowDefinition =
+      Optional.ofNullable(workflow.getWorkflowDefinition())
+              .orElseGet(() -> { ... });
+  ```
+  This code uses `Optional.ofNullable(...)`, which only makes sense if `getWorkflowDefinition()` can be null.
+
+- `DeciderService.decide(WorkflowModel workflow)`:
+  ```java
+  WorkflowDef workflowDefinition =
+      Optional.ofNullable(workflow.getWorkflowDefinition())
+              .orElseThrow(() -> new TerminateWorkflowException(...));
+  ```
+  Here they explicitly guard against `null` from `getWorkflowDefinition()` by throwing if it is null, which implies that callers cannot assume non‑null unless they perform such a check.
+
+- `DeciderService.checkWorkflowTimeout`:
+  ```java
+  WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef == null) {
+      LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+      return;
+  }
+  ```
+  Again, the method explicitly checks for `null` from `getWorkflowDefinition()`.
+
+- `WorkflowSweeper.unack`:
+  ```java
+  (workflowModel.getWorkflowDefinition().getTimeoutSeconds() != 0) ? ...
+  ```
+  This code *does not* null‑check `getWorkflowDefinition()` before dereference, so if a `WorkflowModel` reaches here without an initialized definition, a `NullPointerException` will occur. That is consistent with the fact that `getWorkflowDefinition()` itself can return null; the code simply doesn’t defensively handle that case here.
+
+Other usages, such as in `WorkflowExecutor.restart`, may ensure a non‑null definition in that particular flow, but there is no invariant shown that *every* `WorkflowModel` used with `workflow.getWorkflowDefinition()` has been passed through such initialization logic. Some entry points load a workflow with its definition lazily or may obtain a `WorkflowModel` without populating `workflowDefinition` first.
+
+Since the method itself is a direct field getter and you have code paths that:
+- treat the result as nullable (`Optional.ofNullable` / explicit `== null` checks), and
+- dereference it without checks (leading to a possible NPE),
+
+the only sound conclusion is that at this specific call site
+
+```java
+workflow.getWorkflowDefinition()
+```
+
+`getWorkflowDefinition()` *can* return `null` depending on how `workflow` was created and initialized before this call. There is no guarantee in the provided code that `workflowDefinition` is always set non‑null prior to this invocation.]]></reason>
+  <value>YES</value>
+</response>

@@ -1,0 +1,30 @@
+<response>
+  <reason><![CDATA[
+TaskModel.getWorkflowTask() simply returns the field `workflowTask` with no non‑null guarantees:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+At the specific call site:
+
+```java
+Optional.ofNullable(doWhileTaskModel.getWorkflowTask())
+        .map(WorkflowTask::getLoopCondition)
+        .orElse(null)
+```
+
+and many others in `DoWhile` and the surrounding code, `getWorkflowTask()` is consistently treated as potentially null:
+
+- In `DoWhile.scheduleNextIteration`, `getWorkflowTask()` is wrapped in `Optional.ofNullable(...)`, which is only necessary if null is possible.
+- In `DoWhile.evaluateCondition`, they again use `Optional.ofNullable(task.getWorkflowTask()).orElse(null)` and branch logic on that.
+- In `WorkflowExecutor.scheduleNextIteration`, `loopTask.getWorkflowTask()` is wrapped in `Optional.ofNullable(...).orElseGet(...)`, with a fallback to `workflow.getWorkflowDefinition().getTaskByRefName(...)`. This fallback is only needed if `getWorkflowTask()` can return null.
+- In multiple other locations (e.g., `MetadataMapperService.populateTaskWithDefinition`, `TaskModel.getTaskDefinition`), they use `Optional.ofNullable(this.getWorkflowTask())`, which indicates the codebase explicitly models `workflowTask` as nullable.
+
+There is no code shown that initializes `workflowTask` to a non-null value for all `TaskModel` instances used as `doWhileTaskModel`. Instead, the design relies on null checks and fallbacks when `workflowTask` is absent.
+
+Therefore, at this call site, `doWhileTaskModel.getWorkflowTask()` can evaluate to null.]]></reason>
+  <value>YES</value>
+</response>

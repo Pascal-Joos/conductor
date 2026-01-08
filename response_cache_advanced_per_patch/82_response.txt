@@ -1,0 +1,81 @@
+<response>
+  <reason><![CDATA[
+At this call site, `taskToBeRetried` is created inside `WorkflowExecutor.taskToBeRescheduled`:
+
+```java
+private TaskModel taskToBeRescheduled(WorkflowModel workflow, TaskModel task) {
+    TaskModel taskToBeRetried = task.copy();
+    ...
+    // perform parameter replacement for retried task
+    Map<String, Object> taskInput =
+            parametersUtils.getTaskInput(
+                    taskToBeRetried.getWorkflowTask().getInputParameters(),
+                    workflow,
+                    taskToBeRetried.getWorkflowTask().getTaskDefinition(),
+                    taskToBeRetried.getTaskId());
+    ...
+    return taskToBeRetried;
+}
+```
+
+The specific call site in question is any use of:
+
+```java
+taskToBeRetried.getWorkflowTask()
+```
+
+inside this method, particularly in the `getTaskInput(...)` call where it is dereferenced twice.
+
+Key points:
+
+1. `TaskModel.getWorkflowTask()` is a trivial getter:
+   ```java
+   public WorkflowTask getWorkflowTask() {
+       return workflowTask;
+   }
+   ```
+   It simply returns the field `workflowTask`, which is nullable by design (other parts of the code explicitly check for `null` before using it).
+
+2. There is no initialization or null‑check on `taskToBeRetried.workflowTask` inside `taskToBeRescheduled`.  
+   `taskToBeRetried` is obtained solely via:
+   ```java
+   taskToBeRetried = task.copy();
+   ```
+   and then used immediately:
+   ```java
+   taskToBeRetried.getWorkflowTask().getInputParameters()
+   taskToBeRetried.getWorkflowTask().getTaskDefinition()
+   ```
+   without checking `getWorkflowTask()` for null.
+
+3. The codebase elsewhere explicitly allows `TaskModel.workflowTask` to be null and defends against it:
+   - In `WorkflowExecutor.getTask`:
+     ```java
+     if (task.getWorkflowTask() != null) {
+         return metadataMapperService.populateTaskWithDefinition(task);
+     }
+     ```
+   - In `DeciderService.decide`:
+     ```java
+     WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+     if (workflowTask == null) {
+         workflowTask =
+             workflow.getWorkflowDefinition()
+                     .getTaskByRefName(pendingTask.getReferenceTaskName());
+     }
+     ```
+   - And in many places using `Optional.ofNullable(task.getWorkflowTask())`.
+
+   This shows that `workflowTask` is not guaranteed to be non-null on a `TaskModel`; null is a normal, supported state.
+
+4. The implementation of `TaskModel.copy()` is not provided. Nothing in the shown code guarantees that:
+   - the original `task` passed into `taskToBeRescheduled` has a non-null `workflowTask`, or
+   - `copy()` would create/populate a non-null `workflowTask` when the source `task` had it null.
+
+   Given other code paths that explicitly handle `getWorkflowTask() == null`, there is a real possibility that some `TaskModel` instances passed into `taskToBeRescheduled` may have `workflowTask == null`, and that `copy()` preserves that.
+
+5. Because `getWorkflowTask()` simply returns the field and the field is allowed to be null, at this call site `taskToBeRetried.getWorkflowTask()` can evaluate to null, leading to potential NPEs when `getInputParameters()` or `getTaskDefinition()` are called on it.
+
+Thus, considering only this concrete call site and the provided code, the method `getWorkflowTask()` can return null when invoked as `taskToBeRetried.getWorkflowTask()`.]]></reason>
+  <value>YES</value>
+</response>

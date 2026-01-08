@@ -1,0 +1,43 @@
+<response>
+  <reason><![CDATA[
+At this call site, `runningTask.getStatus()` is invoked inside the stream pipeline in `ForkJoinDynamicTaskMapper`:
+
+```java
+Optional<String> existingTaskRefName =
+        workflowModel.getTasks().stream()
+                .filter(
+                        runningTask ->
+                                runningTask
+                                                .getStatus()
+                                                .equals(
+                                                        TaskModel.Status
+                                                                .IN_PROGRESS)
+                                        || runningTask.getStatus().isTerminal())
+                .map(TaskModel::getReferenceTaskName)
+                ...
+```
+
+The lambda does **not** check for null before dereferencing `runningTask.getStatus()`:
+
+- `runningTask.getStatus().equals(TaskModel.Status.IN_PROGRESS)` will throw a `NullPointerException` if `getStatus()` returns `null`.
+- `runningTask.getStatus().isTerminal()` will also throw if `getStatus()` returns `null`.
+
+The surrounding code does not establish any invariant that every `TaskModel` in `workflowModel.getTasks()` must have a non‑null status. Other parts of the codebase clearly allow `status` to be `null`:
+
+- In multiple places, the code explicitly guards against null status, e.g.:
+
+  ```java
+  if (task.getStatus() != null && task.getStatus().isTerminal()) { ... }
+  if (task.getStatus() != null && task.getStatus().equals(TaskModel.Status.SCHEDULED)) { ... }
+  if (task != null && task.getStatus() != null && task.getStatus().isTerminal()) { ... }
+  ```
+
+- There is no constructor or setter logic shown that would force `status` to be non‑null for all tasks in `workflowModel.getTasks()`; `TaskModel` is a mutable object and `status` is read directly by `getStatus()`.
+
+- The presence of null checks elsewhere demonstrates that the library authors consider `status` possibly null at runtime.
+
+Since `workflowModel.getTasks()` can contain tasks whose `status` field is still null (for example, newly created or partially initialized tasks), nothing in this method or its immediate context prevents `runningTask.getStatus()` from returning null at this specific call site. If it does, the subsequent `.equals(...)` or `.isTerminal()` would lead to an NPE, but that does not change the fact that `getStatus()` **can** itself return null here.
+
+Therefore, at this invocation in `ForkJoinDynamicTaskMapper`, `runningTask.getStatus()` can evaluate to null.]]></reason>
+  <value>YES</value>
+</response>

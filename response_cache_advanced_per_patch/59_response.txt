@@ -1,0 +1,41 @@
+<response>
+  <reason><![CDATA[
+The method `TaskModel.getReferenceTaskName()` simply returns the field `referenceTaskName` with no additional checks or transformations:
+
+```java
+public String getReferenceTaskName() {
+    return referenceTaskName;
+}
+```
+
+So the question reduces to: at the point where `doWhileTaskModel.getReferenceTaskName()` is invoked (inside `DoWhile.execute`), can the `referenceTaskName` field of that specific `TaskModel` (`doWhileTaskModel`) be null?
+
+Inside `DoWhile.execute` the object is received as a parameter:
+
+```java
+public boolean execute(
+        WorkflowModel workflow, TaskModel doWhileTaskModel, WorkflowExecutor workflowExecutor) {
+    ...
+    for (TaskModel t : workflow.getTasks()) {
+        if (doWhileTaskModel
+                        .getWorkflowTask()
+                        .has(TaskUtils.removeIterationFromTaskRefName(t.getReferenceTaskName()))
+                && !doWhileTaskModel.getReferenceTaskName().equals(t.getReferenceTaskName())
+                && doWhileTaskModel.getIteration() == t.getIteration()) {
+            ...
+        }
+    }
+```
+
+Here `doWhileTaskModel.getReferenceTaskName()` is called in a normal `String.equals` comparison. There is no prior null‑check on `doWhileTaskModel.getReferenceTaskName()`, so if it were null, the code would still run (calling `.equals` on the *non-null* `t.getReferenceTaskName()` in the negated condition) and no immediate NPE would arise from this line alone. 
+
+More importantly, nothing in the shown code guarantees that `referenceTaskName` of a `TaskModel` is always set non‑null:
+
+- `TaskModel` is a general data holder; many call sites use `getReferenceTaskName()` without null checks (e.g., mapping, logging, collecting into sets).
+- `WorkflowModel.getTaskByRefName` only enforces non‑null `getReferenceTaskName()` for *tasks already in `workflow.getTasks()`* when that method is called. It does not enforce that `doWhileTaskModel` (which is a system task created elsewhere) must have a non‑null reference task name.
+- The creation of `doWhileTaskModel` happens in `DoWhileTaskMapper.getMappedTasks` via `taskMapperContext.createTaskModel()`. The provided code for that mapper configures type, status, times, etc., but does not itself show any assignment to `referenceTaskName`. Without the implementation of `TaskMapperContext.createTaskModel()` and of `TaskModel`'s construction/initialization, we cannot assert that `referenceTaskName` is always initialized to a non‑null value.
+
+Since `getReferenceTaskName()` just returns the backing field, and there is no visible invariant in the provided code that prevents `referenceTaskName` from being null for `doWhileTaskModel`, it is entirely possible for this field to be null at this specific call site. Therefore, the return value of `doWhileTaskModel.getReferenceTaskName()` can be null here.
+  ]]></reason>
+  <value>YES</value>
+</response>

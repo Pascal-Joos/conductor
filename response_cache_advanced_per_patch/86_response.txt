@@ -1,0 +1,22 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  private void populateWorkflowTaskWithDefinition(WorkflowTask workflowTask) {
+                Utils.checkNotNull(Nullability.castToNonnull(workflowTask), "WorkflowTask cannot be null");
+                if (shouldPopulateTaskDefinition(Nullability.castToNonnull(workflowTask))) {
+                    Nullability.castToNonnull(workflowTask).setTaskDefinition(metadataDAO.getTaskDef(Nullability.castToNonnull(workflowTask).getName()));
+                    if (Nullability.castToNonnull(workflowTask).getTaskDefinition() == null
+                            && Nullability.castToNonnull(workflowTask).getType().equals(TaskType.SIMPLE.name())) {
+                        // ad-hoc task def
+                        Nullability.castToNonnull(workflowTask).setTaskDefinition(new TaskDef(Nullability.castToNonnull(workflowTask).getName()));
+                    }
+                }
+                if (Nullability.castToNonnull(workflowTask).getType().equals(TaskType.SUB_WORKFLOW.name())) {
+                    populateVersionForSubWorkflow(Nullability.castToNonnull(workflowTask));
+                }
+  }
+  ```
+    ]]>
+  </code>
+</response>

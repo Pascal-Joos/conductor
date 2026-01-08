@@ -1,0 +1,48 @@
+```xml
+<response>
+    <reason><![CDATA[
+From the provided method alone, there is no explicit guarantee that `runningTask.getReferenceTaskName()` is non-null.
+
+Walk-through of relevant code:
+
+1. `workflow.getTasks().stream()`
+   - We know only that `workflow.getTasks()` returns some `Collection<TaskModel>`.
+   - There is no evidence here that:
+     - The collection does not contain null elements, or
+     - Each `TaskModel` has a non-null `referenceTaskName`.
+
+2. The lambda:
+   ```java
+   runningTask ->
+       runningTask
+           .getReferenceTaskName()
+           .equals(nextTaskReferenceName)
+   ```
+   This assumes:
+   - `runningTask` itself is not null.
+   - `runningTask.getReferenceTaskName()` is not null.
+
+   If `runningTask` is null, a `NullPointerException` occurs before `getReferenceTaskName()` is called.
+   If `runningTask.getReferenceTaskName()` is null, then the call to `.equals(nextTaskReferenceName)` will throw a `NullPointerException`.
+
+3. There is no prior null-check on `referenceTaskName` of tasks stored in `workflow.getTasks()` within this method. The method's earlier logic only manipulates or uses `task.getReferenceTaskName()`, but that is the *input* parameter `task`, not the `runningTask` values in `workflow.getTasks()`.
+
+4. Whether `getReferenceTaskName()` can *in practice* be null depends entirely on:
+   - The contract of `TaskModel.getReferenceTaskName()`
+   - How `workflow.getTasks()` is populated and what invariants the system enforces.
+
+Because those contracts and invariants are not shown, we cannot infer a guarantee of non-null. The expression is therefore *potentially* null and would cause an NPE if it is.
+
+Hence, based purely on the given code, we cannot assert safety: it is possible that `runningTask.getReferenceTaskName()` returns null.
+    ]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[
+Provide the `TaskModel` class definition (especially the `referenceTaskName` field and `getReferenceTaskName()` method) or its documented contract (e.g., annotations like @NotNull or Javadoc guarantees).
+        ]]></request>
+        <request><![CDATA[
+Provide details or code showing how `workflow.getTasks()` is constructed/populated, including any invariants (e.g., "all tasks must have a non-null referenceTaskName").
+        ]]></request>
+    </requests>
+</response>
+```

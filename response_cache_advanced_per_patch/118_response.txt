@@ -1,0 +1,28 @@
+```xml
+<response>
+    <reason><![CDATA[
+Based only on the provided method
+
+    public Status getStatus() {
+        return status;
+    }
+
+there is no information about:
+- how or where `status` is declared,
+- whether it is initialized at declaration,
+- whether it is assigned in constructors or other methods,
+- whether any invariants or annotations (@NonNull, etc.) guarantee it is never null.
+
+Without seeing the field declaration of `status` and its assignments, both of these are possible:
+- `status` is never assigned (or explicitly assigned null) → `return status;` can be null,
+- `status` is always assigned a non-null value before `getStatus()` is called → `return status;` cannot be null.
+
+Since the nullability depends entirely on code and contracts not shown, it cannot be determined from the snippet alone.
+    ]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the declaration of the `status` field (including any annotations) and its initial value, if any.]]></request>
+        <request><![CDATA[Provide constructors and any methods that assign to `status`, or describe any invariant/contract that `status` is guaranteed non-null.]]></request>
+    </requests>
+</response>
+```

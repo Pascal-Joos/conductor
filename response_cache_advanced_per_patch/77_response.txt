@@ -1,0 +1,93 @@
+<response>
+  <reason><![CDATA[
+At the specific call site
+
+    doWhileTaskModel
+        .getWorkflowTask()
+
+`getWorkflowTask()` simply returns the value of the `workflowTask` field:
+
+    public WorkflowTask getWorkflowTask() {
+        return workflowTask;
+    }
+
+There is no initialization or null‑check in `TaskModel` that guarantees `workflowTask` is non‑null for a DO_WHILE task, and the provided code shows multiple usages that explicitly account for `workflowTask` possibly being null:
+
+- In `DeciderService.decide(...)`:
+  
+  ```java
+  WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+  if (workflowTask == null) {
+      workflowTask =
+          workflow.getWorkflowDefinition()
+                  .getTaskByRefName(pendingTask.getReferenceTaskName());
+  }
+  ```
+  
+  This null check and fallback only make sense if `getWorkflowTask()` can return null.
+
+- In `WorkflowExecutor.getTask(String taskId)`:
+
+  ```java
+  if (task.getWorkflowTask() != null) {
+      return metadataMapperService.populateTaskWithDefinition(task);
+  }
+  return task;
+  ```
+
+  Again, the explicit null check shows that a `TaskModel` can exist with `workflowTask == null`.
+
+- `TaskModel.getTaskDefinition()` is written defensively:
+
+  ```java
+  public Optional<TaskDef> getTaskDefinition() {
+      return Optional.ofNullable(this.getWorkflowTask()).map(WorkflowTask::getTaskDefinition);
+  }
+  ```
+
+  Wrapping `getWorkflowTask()` in `Optional.ofNullable` would be pointless if `workflowTask` were guaranteed non‑null.
+
+For the DO_WHILE code itself (where the call site is located):
+
+```java
+boolean scheduleNextIteration(
+        TaskModel doWhileTaskModel, WorkflowModel workflow, WorkflowExecutor workflowExecutor) {
+    LOGGER.debug(
+        "Scheduling loop tasks for task {} as condition {} evaluated to true",
+        doWhileTaskModel.getTaskId(),
+        doWhileTaskModel.getWorkflowTask().getLoopCondition());
+    workflowExecutor.scheduleNextIteration(doWhileTaskModel, workflow);
+    return true;
+}
+```
+
+and throughout `DoWhile.execute(...)` and `DoWhile.evaluateCondition(...)`, the code calls:
+
+- `doWhileTaskModel.getWorkflowTask().getLoopCondition()`
+- `doWhileTaskModel.getWorkflowTask().has(...)`
+- `doWhileTaskModel.getWorkflowTask().getLoopOver()`
+- `task.getWorkflowTask().getInputParameters()`
+
+without any null checks. This means the authors *assume* `workflowTask` is non‑null here, but that is only a usage assumption, not a guarantee enforced by the `TaskModel` implementation or by the code paths shown. There is no constructor, factory, or loader in the provided snippets that sets `workflowTask` to a non‑null value for all DO_WHILE tasks or for `doWhileTaskModel` specifically.
+
+We also see that `ExecutionService.poll`, `AsyncSystemTaskExecutor.execute`, and many other places obtain `TaskModel` objects through DAOs and operate on them without necessarily passing them through `MetadataMapperService.populateTaskWithDefinition`, which only populates definitions *if* `workflowTask` is non‑null:
+
+```java
+if (task.getWorkflowTask() != null) {
+    return metadataMapperService.populateTaskWithDefinition(task);
+}
+```
+
+So the presence of definitions is *conditioned* on `workflowTask` already being non‑null; it does not guarantee non‑nullity.
+
+Given all this:
+
+- `getWorkflowTask()` is a trivial field accessor.
+- Other parts of the system explicitly treat `getWorkflowTask()` as possibly returning null.
+- No provided code proves that `doWhileTaskModel` is always constructed/populated with a non‑null `workflowTask`.
+
+Therefore, at this specific call site, `doWhileTaskModel.getWorkflowTask()` **can** be null (which would lead to a `NullPointerException` when dereferenced, but that is still a null result from `getWorkflowTask()` itself).
+
+]]></reason>
+  <value>YES</value>
+</response>

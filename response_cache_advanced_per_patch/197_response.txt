@@ -1,0 +1,7 @@
+<response>
+  <success>false</success>
+  <methods>
+    <method>getWorkflowModel</method>
+    <method>collectTasks</method>
+  </methods>
+</response>

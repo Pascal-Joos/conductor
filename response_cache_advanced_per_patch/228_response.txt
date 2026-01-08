@@ -1,0 +1,41 @@
+```xml
+<response>
+    <reason><![CDATA[
+From the provided method alone, there is no null check or defensive code around ValidationContext.getMetadataDAO(), and no information about how ValidationContext or its metadataDAO field (or equivalent) is initialized.
+
+The expression is used here:
+
+    TaskDef taskDef =
+        Optional.ofNullable(workflowTask.getTaskDefinition())
+            .orElse(
+                ValidationContext.getMetadataDAO()
+                    .getTaskDef(workflowTask.getName()));
+
+For ValidationContext.getMetadataDAO() to be guaranteed non-null, one of the following must be true by design/contract outside this method:
+
+1. ValidationContext.getMetadataDAO() is a static method that:
+   - Always returns a non-null DAO instance, and
+   - Is initialized in a way that makes it impossible for it to be null at this call site (e.g., eager static initialization with no failure path, or a framework contract guaranteeing that initialization has completed successfully before this validator is ever invoked).
+
+2. ValidationContext is a utility/holder whose internal state is guaranteed non-null at all times (e.g., private static final MetadataDAO METADATA_DAO = new MetadataDAOImpl(...); with no setters).
+
+However, nothing in this specific method establishes or checks those guarantees. There are no:
+- Null checks on ValidationContext (it is used as a class, implying a static method).
+- Null checks on ValidationContext.getMetadataDAO().
+- Try/catch around the call that would handle a possible NullPointerException from a null DAO.
+
+Therefore, from the local code context alone, it is entirely possible that:
+- ValidationContext has not been initialized yet,
+- Its internal DAO field is null, or
+- getMetadataDAO() might return null under some misconfiguration or error condition.
+
+Because the behavior and contract of ValidationContext.getMetadataDAO() are not shown, and because Java does not prevent that method from returning null, the static analyzer cannot conclusively rule out a null value here based solely on this method.
+
+Thus, without additional information about the implementation/contract of ValidationContext.getMetadataDAO(), it is not possible to guarantee that ValidationContext.getMetadataDAO() cannot be null.]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the implementation (or documented contract) of ValidationContext.getMetadataDAO().]]></request>
+        <request><![CDATA[Indicate how and when the underlying MetadataDAO (or equivalent) is initialized and whether it can ever be unset or cleared.]]></request>
+    </requests>
+</response>
+```

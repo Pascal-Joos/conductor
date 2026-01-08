@@ -1,0 +1,6 @@
+<response>
+    <reason><![CDATA[
+The method name `withDeciderService` neither matches any of the known framework initializer patterns (e.g., `onCreate`, `init`) nor starts with "init" or "initialize". Its behavior—assigning a single field and returning `this`—is characteristic of a builder-style setter, not a designated initializer method that frameworks or annotation processors rely on for object setup. Under the described rules, such a builder setter should not be treated as an initializer method for NullAway.
+    ]]></reason>
+    <value>NO</value>
+</response>

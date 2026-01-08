@@ -1,0 +1,101 @@
+<response>
+  <reason><![CDATA[
+At the call site in question, `terminateTask` is a `TaskModel` reference, and the method invoked is:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+This method simply returns the field `workflowTask` with no additional checks or guarantees of non-nullity.
+
+We must determine whether `terminateTask`’s `workflowTask` field is guaranteed to be non-null at the moment of this specific call:
+
+```java
+terminateTask
+    .getWorkflowTask()
+```
+
+where this occurs inside `WorkflowExecutor.endExecution`:
+
+```java
+private void endExecution(WorkflowModel workflow, TaskModel terminateTask) {
+    if (terminateTask != null) {
+        String terminationStatus =
+                (String)
+                        terminateTask
+                                .getWorkflowTask()
+                                .getInputParameters()
+                                .get(Terminate.getTerminationStatusParameter());
+        String reason =
+                (String)
+                        terminateTask
+                                .getWorkflowTask()
+                                .getInputParameters()
+                                .get(Terminate.getTerminationReasonParameter());
+        ...
+    } else {
+        ...
+    }
+}
+```
+
+`endExecution` is called from `WorkflowExecutor.decide(WorkflowModel)`:
+
+```java
+DeciderService.DeciderOutcome outcome = deciderService.decide(workflow);
+if (outcome.isComplete) {
+    endExecution(workflow, outcome.terminateTask);
+    return workflow;
+}
+```
+
+`outcome.terminateTask` is set in `DeciderService.decide(...)`:
+
+```java
+boolean hasSuccessfulTerminateTask = false;
+for (TaskModel task : workflow.getTasks()) {
+    ...
+    if (TERMINATE.name().equals(task.getTaskType())
+            && task.getStatus().isTerminal()
+            && task.getStatus().isSuccessful()) {
+        hasSuccessfulTerminateTask = true;
+        outcome.terminateTask = task;
+    }
+}
+...
+if (hasSuccessfulTerminateTask
+        || (outcome.tasksToBeScheduled.isEmpty() && checkForWorkflowCompletion(workflow))) {
+    outcome.isComplete = true;
+}
+```
+
+The only constraints for setting `outcome.terminateTask` are:
+- the task type is `TERMINATE`,
+- its status is terminal,
+- and that status is successful.
+
+There is no enforcement here that the task’s `workflowTask` field is non-null. Other uses of `TaskModel` in this codebase explicitly guard for possible null `workflowTask`:
+
+- `WorkflowExecutor.getTask` only calls `metadataMapperService.populateTaskWithDefinition(task)` if `task.getWorkflowTask() != null`, meaning tasks can exist with `workflowTask == null`.
+- `WorkflowSystemTask.isAsyncComplete(TaskModel task)` uses:
+  ```java
+  return Optional.ofNullable(task.getWorkflowTask())
+          .map(WorkflowTask::isAsyncComplete)
+          .orElse(false);
+  ```
+  This explicitly handles `getWorkflowTask()` being null.
+- Many other sites wrap `getWorkflowTask()` in `Optional.ofNullable(...)` or fall back to `workflow.getWorkflowDefinition().getTaskByRefName(...)` when it’s null, again acknowledging that `getWorkflowTask()` may return null.
+
+No code shown imposes a guarantee that a TERMINATE-type task with terminal successful status must have a non-null `workflowTask`. It is entirely possible, given the general handling of tasks, that such a task exists in `workflow.getTasks()` with `workflowTask == null`. In that case, `outcome.terminateTask` will reference that task, and:
+
+```java
+terminateTask.getWorkflowTask()
+```
+
+will evaluate to `null` at this call site.
+
+Thus, for this specific invocation, there is no enforced invariant that prevents `workflowTask` from being null, and the method can return null here.]]></reason>
+  <value>YES</value>
+</response>

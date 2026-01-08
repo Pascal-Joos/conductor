@@ -1,0 +1,43 @@
+<response>
+  <reason><![CDATA[
+The method `TaskModel.getReferenceTaskName()` simply returns the field `referenceTaskName` with no additional logic:
+
+```java
+public String getReferenceTaskName() {
+    return referenceTaskName;
+}
+```
+
+At the analyzed call site you asked about (`task.getReferenceTaskName()`), the surrounding code shows many usages where `getReferenceTaskName()` is treated as potentially nullable:
+
+- In `WorkflowModel.getTaskByRefName(String refName)`:
+  ```java
+  for (TaskModel task : tasks) {
+      if (task.getReferenceTaskName() == null) {
+          throw new RuntimeException("Task ... does not have reference name specified.");
+      }
+      if (task.getReferenceTaskName().equals(refName)) { ... }
+  }
+  ```
+  This explicit null-check and exception prove that for some `TaskModel` instances, `referenceTaskName` can indeed be `null` at runtime before this guard.
+
+- In multiple places, the code uses `map(TaskModel::getReferenceTaskName)` without null filtering, and in at least one place explicitly filters out nulls:
+  ```java
+  workflow.getTasks().stream()
+      .map(TaskModel::getReferenceTaskName)
+      .filter(Objects::nonNull)
+      .anyMatch(nextTaskReferenceName::equals);
+  ```
+  The need to filter with `Objects::nonNull` indicates `getReferenceTaskName()` may return null for some tasks.
+
+- Now, specifically for the call site you provided: `task.getReferenceTaskName()` in `TaskModel.equals` and throughout `DeciderService`, `WorkflowExecutor`, mappers, etc., there is no universal invariant or constructor logic shown that guarantees `referenceTaskName` is always initialized to a non-null value for every `TaskModel` before these calls. `TaskModel` is also instantiated manually in some places (e.g. in `WorkflowExecutor.skipTaskFromWorkflow`), where `setReferenceTaskName` is used, but nothing prevents other code from creating a `TaskModel` without setting this field.
+
+Since:
+1. `getReferenceTaskName()` is a direct field getter.
+2. Other parts of the codebase explicitly guard against `null` `referenceTaskName`, demonstrating it can be null.
+3. No global guarantee is provided that `referenceTaskName` is non-null for all `TaskModel` instances reaching the given call sites.
+
+We must conclude that at this specific invocation `task.getReferenceTaskName()` can evaluate to `null`.
+  ]]></reason>
+  <value>YES</value>
+</response>

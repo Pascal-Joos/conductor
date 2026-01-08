@@ -1,0 +1,21 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    @Nullable
+    private String getNextTasksToBeScheduled(WorkflowModel workflow, TaskModel task) {
+        final WorkflowDef def = workflow.getWorkflowDefinition();
+        if (def == null) {
+            return null;
+        }
+        String taskReferenceName = task.getReferenceTaskName();
+        WorkflowTask taskToSchedule = def.getNextTask(taskReferenceName);
+        while (isTaskSkipped(taskToSchedule, workflow)) {
+            taskToSchedule = def.getNextTask(taskToSchedule.getTaskReferenceName());
+        }
+        return taskToSchedule == null ? null : taskToSchedule.getTaskReferenceName();
+    }
+  ```
+    ]]>
+  </code>
+</response>

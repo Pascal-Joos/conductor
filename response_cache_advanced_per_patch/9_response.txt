@@ -1,0 +1,4 @@
+<response>
+    <reason><![CDATA[The method name is `withWorkflowModel`, which neither matches any known framework-specific initializer pattern (e.g., `onCreate`, `init`) nor begins with `init` or `initialize`. Its behavior and naming convention align with a fluent setter in a builder pattern (taking a value, assigning it to a field, and returning `this`), which you explicitly do not want to treat as an initializer method. Therefore, it should not be considered an initializer method for NullAway.]]></reason>
+    <value>NO</value>
+</response>

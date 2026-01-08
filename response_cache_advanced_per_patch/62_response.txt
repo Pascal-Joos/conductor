@@ -1,0 +1,15 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+@Override
+    public void cancel(WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
+        Message message = new Message(Nullability.castToNonnull(task.getTaskId()), null, Nullability.castToNonnull(task.getTaskId()));
+        String queueName = computeQueueName(workflow, task);
+        ObservableQueue queue = getQueue(queueName, task.getTaskId());
+        queue.ack(List.of(message));
+}
+  ```
+    ]]>
+  </code>
+</response>

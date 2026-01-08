@@ -1,0 +1,44 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private TaskModel taskToBeRescheduled(WorkflowModel workflow, TaskModel task) {
+        TaskModel taskToBeRetried = task.copy();
+        taskToBeRetried.setTaskId(idGenerator.generate());
+        taskToBeRetried.setRetriedTaskId(task.getTaskId());
+        taskToBeRetried.setStatus(SCHEDULED);
+        taskToBeRetried.setRetryCount(task.getRetryCount() + 1);
+        taskToBeRetried.setRetried(false);
+        taskToBeRetried.setPollCount(0);
+        taskToBeRetried.setCallbackAfterSeconds(0);
+        taskToBeRetried.setSubWorkflowId(null);
+        taskToBeRetried.setScheduledTime(0);
+        taskToBeRetried.setStartTime(0);
+        taskToBeRetried.setEndTime(0);
+        taskToBeRetried.setWorkerId(null);
+        taskToBeRetried.setReasonForIncompletion(null);
+        taskToBeRetried.setSeq(0);
+
+        // perform parameter replacement for retried task
+        Map<String, Object> taskInput =
+                parametersUtils.getTaskInput(
+                        Optional.ofNullable(taskToBeRetried.getWorkflowTask())
+                                .map(WorkflowTask::getInputParameters)
+                                .orElse(Collections.emptyMap()),
+                        workflow,
+                        Optional.ofNullable(taskToBeRetried.getWorkflowTask())
+                                .map(WorkflowTask::getTaskDefinition)
+                                .orElse(null),
+                        taskToBeRetried.getTaskId());
+        taskToBeRetried.getInputData().putAll(taskInput);
+
+        task.setRetried(true);
+        // since this task is being retried and a retry has been computed, task lifecycle is
+        // complete
+        task.setExecuted(true);
+        return taskToBeRetried;
+}
+  ```
+    ]]>
+  </code>
+</response>

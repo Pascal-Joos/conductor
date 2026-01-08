@@ -1,0 +1,32 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public void resetCallbacksForWorkflow(String workflowId) {
+        WorkflowModel workflow = executionDAOFacade.getWorkflowModel(workflowId, true);
+        if (workflow.getStatus().isTerminal()) {
+            throw new ConflictException(
+                    "Workflow is in terminal state. Status = %s", workflow.getStatus());
+        }
+
+        // Get SIMPLE tasks in SCHEDULED state that have callbackAfterSeconds > 0 and set the
+        // callbackAfterSeconds to 0
+        workflow.getTasks().stream()
+                .filter(
+                        task ->
+                                !systemTaskRegistry.isSystemTask(task.getTaskType())
+                                        && SCHEDULED == task.getStatus()
+                                        && task.getCallbackAfterSeconds() > 0)
+                .forEach(
+                        task -> {
+                            if (queueDAO.resetOffsetTime(
+                                    Nullability.castToNonnull(QueueUtils.getQueueName(task)), task.getTaskId())) {
+                                task.setCallbackAfterSeconds(0);
+                                executionDAOFacade.updateTask(task);
+                            }
+                        });
+}
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,73 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public void skipTaskFromWorkflow(
+            String workflowId, String taskReferenceName, SkipTaskRequest skipTaskRequest) {
+
+        WorkflowModel workflow = executionDAOFacade.getWorkflowModel(workflowId, true);
+
+        // If the workflow is not running then cannot skip any task
+        if (!workflow.getStatus().equals(WorkflowModel.Status.RUNNING)) {
+            String errorMsg =
+                    String.format(
+                            "The workflow %s is not running so the task referenced by %s cannot be skipped",
+                            workflowId, taskReferenceName);
+            throw new IllegalStateException(errorMsg);
+        }
+
+        WorkflowDef workflowDef =
+                Optional.ofNullable(workflow.getWorkflowDefinition())
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                String.format(
+                                                        "Missing workflow definition for workflow: %s",
+                                                        workflowId)));
+
+        // Check if the reference name is as per the workflowdef
+        WorkflowTask workflowTask = workflowDef.getTaskByRefName(taskReferenceName);
+        if (workflowTask == null) {
+            String errorMsg =
+                    String.format(
+                            "The task referenced by %s does not exist in the WorkflowDefinition %s",
+                            taskReferenceName, workflow.getWorkflowName());
+            throw new IllegalStateException(errorMsg);
+        }
+
+        // If the task is already started the again it cannot be skipped
+        workflow.getTasks()
+                .forEach(
+                        task -> {
+                            if (task.getReferenceTaskName().equals(taskReferenceName)) {
+                                String errorMsg =
+                                        String.format(
+                                                "The task referenced %s has already been processed, cannot be skipped",
+                                                taskReferenceName);
+                                throw new IllegalStateException(errorMsg);
+                            }
+                        });
+
+        // Now create a "SKIPPED" task for this workflow
+        TaskModel taskToBeSkipped = new TaskModel();
+        taskToBeSkipped.setTaskId(idGenerator.generate());
+        taskToBeSkipped.setReferenceTaskName(taskReferenceName);
+        taskToBeSkipped.setWorkflowInstanceId(workflowId);
+        taskToBeSkipped.setWorkflowPriority(workflow.getPriority());
+        taskToBeSkipped.setStatus(SKIPPED);
+        taskToBeSkipped.setEndTime(System.currentTimeMillis());
+        taskToBeSkipped.setTaskType(workflowTask.getName());
+        taskToBeSkipped.setCorrelationId(workflow.getCorrelationId());
+        if (skipTaskRequest != null) {
+            taskToBeSkipped.setInputData(skipTaskRequest.getTaskInput());
+            taskToBeSkipped.setOutputData(skipTaskRequest.getTaskOutput());
+            taskToBeSkipped.setInputMessage(skipTaskRequest.getTaskInputMessage());
+            taskToBeSkipped.setOutputMessage(skipTaskRequest.getTaskOutputMessage());
+        }
+        executionDAOFacade.createTasks(Collections.singletonList(taskToBeSkipped));
+        decide(workflow.getWorkflowId());
+}
+  ```
+    ]]>
+  </code>
+</response>

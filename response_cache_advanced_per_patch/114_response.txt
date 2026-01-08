@@ -1,0 +1,72 @@
+<response>
+  <reason><![CDATA[
+The call site in question is `subWorkflowTask.getWorkflowTask()` inside `WorkflowExecutor.updateAndPushParents`:
+
+```java
+TaskModel subWorkflowTask =
+        executionDAOFacade.getTaskModel(workflow.getParentWorkflowTaskId());
+if (subWorkflowTask.getWorkflowTask().isOptional()) {
+    // ...
+}
+```
+
+Here, `getWorkflowTask()` is just:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+There is no guarantee anywhere in the shown code that `workflowTask` on a `TaskModel` is always non‑null. In fact, elsewhere in the codebase it is explicitly treated as potentially null:
+
+- `WorkflowExecutor.getTask`:
+  ```java
+  return Optional.ofNullable(executionDAOFacade.getTaskModel(taskId))
+          .map(task -> {
+              if (task.getWorkflowTask() != null) {
+                  return metadataMapperService.populateTaskWithDefinition(task);
+              }
+              return task;
+          })
+          .orElse(null);
+  ```
+  This branch only populates definitions if `task.getWorkflowTask() != null`, implying it may be null.
+
+- `DeciderService.decide`:
+  ```java
+  WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+  if (workflowTask == null) {
+      workflowTask =
+              workflow.getWorkflowDefinition()
+                      .getTaskByRefName(pendingTask.getReferenceTaskName());
+  }
+  ```
+  This code explicitly checks for a null `getWorkflowTask()` and recovers from it.
+
+- `WorkflowExecutor.scheduleNextIteration`:
+  ```java
+  WorkflowTask workflowTask =
+          Optional.ofNullable(loopTask.getWorkflowTask())
+                  .orElseGet(() ->
+                          workflow.getWorkflowDefinition()
+                                  .getTaskByRefName(loopTask.getReferenceTaskName()));
+  if (workflowTask == null || workflowTask.getLoopOver() == null || ...) {
+      return;
+  }
+  ```
+  Again, `getWorkflowTask()` is expected to be possibly null.
+
+Given this, `workflowTask` is not universally initialized or enforced to be non‑null for all tasks retrieved via `executionDAOFacade.getTaskModel(...)`. The parent sub‑workflow task loaded in `updateAndPushParents` comes from that DAO, and there is no shown code path that guarantees its `workflowTask` field is set before `updateAndPushParents` is invoked.
+
+Therefore, at this specific call site:
+
+```java
+if (subWorkflowTask.getWorkflowTask().isOptional()) {
+```
+
+`subWorkflowTask.getWorkflowTask()` can be null, which would in fact lead to a `NullPointerException` when `.isOptional()` is dereferenced. The method `getWorkflowTask()` itself simply returns the field and does not defensively avoid null.
+
+So, for this call site, the return value may be null.]]></reason>
+  <value>YES</value>
+</response>

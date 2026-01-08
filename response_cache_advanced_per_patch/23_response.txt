@@ -1,0 +1,33 @@
+```xml
+<response>
+    <reason><![CDATA[
+The variable `joinOn` is initialized solely from the task's input data without any null check:
+
+    List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+Key observations:
+
+1. `task.getInputData()` is assumed to return a `Map<String, Object>`.  
+   The semantics of `Map.get(key)` in Java allow it to return `null` if:
+   - The key `"joinOn"` is not present in the map, or
+   - The key is present but its associated value is `null`.
+
+2. No null-check is performed on `joinOn` before this line:
+
+    if (task.isLoopOverTask()) {
+        joinOn =
+            joinOn.stream()
+                .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
+                .collect(Collectors.toList());
+    }
+
+So, if `task.getInputData().get("joinOn")` returns `null`, then `joinOn` will be `null`.  
+In that case, the call `joinOn.stream()` would result in a `NullPointerException`.
+
+3. There is no prior guarantee in this method that `task.getInputData()` must contain a non-null value for `"joinOn"`. Any such guarantee would need to come from external contract or documentation of `TaskModel`/`Workflow` configuration, which is not provided here.
+
+Given only the method as written and standard Java `Map` behavior, `joinOn` can indeed be `null` at the `joinOn.stream()` call site.
+    ]]></reason>
+    <value>YES</value>
+</response>
+```

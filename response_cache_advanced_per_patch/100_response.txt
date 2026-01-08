@@ -1,0 +1,46 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private void endExecution(WorkflowModel workflow, TaskModel terminateTask) {
+        if (terminateTask != null && terminateTask.getWorkflowTask() != null) {
+            String terminationStatus =
+                    Optional.ofNullable(
+                                    (String)
+                                            terminateTask
+                                                    .getWorkflowTask()
+                                                    .getInputParameters()
+                                                    .get(Terminate.getTerminationStatusParameter()))
+                            .orElse(WorkflowModel.Status.COMPLETED.name());
+            String reason =
+                    (String)
+                            terminateTask
+                                    .getWorkflowTask()
+                                    .getInputParameters()
+                                    .get(Terminate.getTerminationReasonParameter());
+            if (StringUtils.isBlank(reason)) {
+                reason =
+                        String.format(
+                                "Workflow is %s by TERMINATE task: %s",
+                                terminationStatus, terminateTask.getTaskId());
+            }
+            if (WorkflowModel.Status.FAILED.name().equals(terminationStatus)) {
+                workflow.setStatus(WorkflowModel.Status.FAILED);
+                workflow =
+                        terminate(
+                                workflow,
+                                new TerminateWorkflowException(
+                                        reason, workflow.getStatus(), terminateTask));
+            } else {
+                workflow.setReasonForIncompletion(reason);
+                workflow = completeWorkflow(workflow);
+            }
+        } else {
+            workflow = completeWorkflow(workflow);
+        }
+        cancelNonTerminalTasks(workflow);
+}
+  ```
+    ]]>
+  </code>
+</response>

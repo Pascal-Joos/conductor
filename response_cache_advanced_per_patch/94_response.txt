@@ -1,0 +1,49 @@
+<response>
+  <reason><![CDATA[
+The method `TaskModel.getWorkflowTask()` is just:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+There is no initialization or null‑check guarantee shown for the `workflowTask` field. Across the provided call sites, the code explicitly treats `getWorkflowTask()` as potentially null:
+
+- In `WorkflowSystemTask.isAsyncComplete(TaskModel task)`:
+
+```java
+return Optional.ofNullable(task.getWorkflowTask())
+        .map(WorkflowTask::isAsyncComplete)
+        .orElse(false);
+```
+
+Here `Optional.ofNullable` is used, which only makes sense if `task.getWorkflowTask()` might be null.
+
+- In `DeciderService.decide(...)`:
+
+```java
+WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+if (workflowTask == null) {
+    workflowTask =
+        workflow.getWorkflowDefinition()
+                .getTaskByRefName(pendingTask.getReferenceTaskName());
+}
+```
+
+This explicitly checks for `null` from `getWorkflowTask()`.
+
+- In `WorkflowExecutor.getTask(String taskId)`:
+
+```java
+if (task.getWorkflowTask() != null) {
+    return metadataMapperService.populateTaskWithDefinition(task);
+}
+return task;
+```
+
+Again, the `!= null` guard shows `getWorkflowTask()` is allowed to be null.
+
+No code path you provided enforces a non-null invariant for `workflowTask` before the general call site `task.getWorkflowTask()`; instead, multiple places demonstrate that `null` is a normal, handled case. Therefore, at this specific invocation `task.getWorkflowTask()`, the return value can be null.]]></reason>
+  <value>YES</value>
+</response>

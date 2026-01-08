@@ -1,0 +1,41 @@
+```xml
+<response>
+    <reason><![CDATA[
+Based solely on the provided method body, it cannot be proven that resolvedParams.get("name") is non-null.
+
+Key points:
+
+1. The value comes from a Map lookup:
+   - resolvedParams is obtained via:
+     Map<String, Object> resolvedParams = getSubWorkflowInputParameters(workflowModel, subWorkflowParams);
+   - There is no null-check on resolvedParams itself.
+   - There is no null-check on resolvedParams.get("name") before calling .toString().
+
+2. Behavior of `Map.get`:
+   - In Java, `Map#get(Object key)` returns `null` if the key is not present or is mapped to null.
+   - Therefore, unless there is a guarantee about the content of resolvedParams, resolvedParams.get("name") can be null.
+
+3. Missing contracts / implementations:
+   - You have not provided the implementation or documented contract of:
+     - getSubWorkflowInputParameters(WorkflowModel, SubWorkflowParams)
+   - Unless that method (by contract or implementation) guarantees that:
+     - it never returns null for resolvedParams, and
+     - the returned Map always contains a non-null value under the key "name",
+     there is no static guarantee that resolvedParams.get("name") is non-null.
+
+4. SubWorkflowParams and "name":
+   - While it’s common in workflow engines (including Conductor-style mappers) that "name" is a required parameter for sub-workflows, that is a semantic expectation, not a Java language guarantee.
+   - If validation enforcing presence and non-nullity of "name" happens earlier in the call chain (e.g., in getSubWorkflowParams or getSubWorkflowInputParameters), that validation is not shown here.
+   - Without seeing that validation or a documented invariant, the null risk remains.
+
+5. Practical nullability:
+   - If:
+       getSubWorkflowInputParameters(...) sometimes returns a Map without "name", or
+       "name" is optional or may resolve to null from workflow input / expressions,
+     then resolvedParams.get("name") will be null, leading to a NullPointerException when .toString() is called.
+
+Conclusion:
+Given only the shown method and no explicit contract or implementation details of getSubWorkflowInputParameters, we must treat resolvedParams.get("name") as possibly null.]]></reason>
+    <value>YES</value>
+</response>
+```

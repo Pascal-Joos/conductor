@@ -1,0 +1,18 @@
+<response>
+  <reason><![CDATA[
+At this call site, `task` is of type `TaskModel`, and `getStatus()` simply returns the `status` field. There is no guarantee in the shown code that `status` is always initialized or non‑null:
+
+- New `TaskModel` instances can be created via various mappers (`UserDefinedTaskMapper`, `HTTPTaskMapper`, `EventTaskMapper`, `WaitTaskMapper`, `HumanTaskMapper`, `LambdaTaskMapper`, `JsonJQTransformTaskMapper`, `TerminateTaskMapper`, `DoWhileTaskMapper`, `KafkaPublishTaskMapper`, `InlineTaskMapper`, etc.), and those mappers explicitly set `status` to some non‑null value when they create a task. However, that does not cover *all* possible constructions or lifecycle states of `TaskModel` in the system.
+- The `TaskModel` class itself has no constructor or invariant shown that forces `status` to be non‑null. It is just a field that callers may or may not set.
+- Multiple places in the code explicitly *defensively* check for `null` status:
+  - `ParametersUtils.getTaskInputV2` does `if (task.getStatus() != null) { ... }`, implying `getStatus()` may be null.
+  - `DoWhileTaskMapper.getMappedTasks` checks `if (task != null && task.getStatus() != null && task.getStatus().isTerminal())`.
+  - `DeciderService.checkTaskPollTimeout` checks `task.getStatus() == null` and returns early in that case.
+  - `DeciderService.retry` uses `Nullability.castToNonnull(task.getStatus())`, again indicating `status` can be null.
+These uses show that across the codebase, `task.getStatus()` is treated as nullable.
+
+For the specific call site `task.getStatus()` you highlighted, there is no prior guarding condition that ensures `status` is non‑null before the call; `task` is just a `TaskModel`. Since other parts of the code explicitly anticipate `task.getStatus()` being `null`, and there is no global invariant preventing that, this invocation can indeed observe a null value.
+
+Therefore, at this call site, `getStatus()` can return null.]]></reason>
+  <value>YES</value>
+</response>

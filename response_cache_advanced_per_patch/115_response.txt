@@ -1,0 +1,4 @@
+<response>
+    <reason><![CDATA[By your own criteria, initializer methods are either well-known framework lifecycle methods (like onCreate or init) or any method whose name starts with "init" or "initialize" and is not a setter. The given method is named setStatus, clearly following the setter naming convention (starting with "set"), not "init" or "initialize". Therefore, even though it assigns a field, it should be treated as a regular setter, not as an initializer method for NullAway’s purposes.]]></reason>
+    <value>NO</value>
+</response>

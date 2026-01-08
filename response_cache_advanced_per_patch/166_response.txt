@@ -1,0 +1,17 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public void startPolling(WorkflowSystemTask systemTask, String queueName) {
+        Executors.newSingleThreadScheduledExecutor()
+                .scheduleWithFixedDelay(
+                        () -> this.pollAndExecute(systemTask, Nullability.castToNonnull(queueName)),
+                        1000,
+                        pollInterval,
+                        TimeUnit.MILLISECONDS);
+        LOGGER.info("Started listening for task: {} in queue: {}", systemTask, queueName);
+}
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,35 @@
+```xml
+<response>
+    <reason><![CDATA[
+From the provided method alone, there is no explicit guarantee that task.getStatus() is non-null.
+
+Control flow:
+
+1. task is assigned from:
+   TaskModel task = workflowModel.getTaskByRefName(workflowTask.getTaskReferenceName());
+
+2. The only check before calling task.getStatus() is:
+   if (task != null && task.getStatus().isTerminal()) {
+
+   This guards against task being null, but does not guard against task.getStatus() being null.
+
+To determine if task.getStatus() can be null, we need to know the contract of:
+- WorkflowModel.getTaskByRefName(...)
+- TaskModel.getStatus()
+- How TaskModel instances are constructed and populated
+
+Common patterns in similar code (e.g., Netflix Conductor) often *intend* for TaskModel.getStatus() to always be non-null for any persisted or active task, but that is a logical/business guarantee, not a Java language guarantee visible in this snippet. There is no @NonNull annotation, no explicit initialization here, and no preceding code that forces status to be set before retrieval.
+
+Therefore, using only the provided snippet and without the definitions and invariants of TaskModel and WorkflowModel, we cannot safely conclude that task.getStatus() is never null. It may or may not be null depending on those external contracts and implementations.]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the implementation or contract (e.g., Javadoc, annotations) of TaskModel, especially:
+- The field backing getStatus()
+- All constructors and setters that affect status
+- Any invariants stating that status is never null.]]></request>
+        <request><![CDATA[Provide the implementation or contract of WorkflowModel.getTaskByRefName(String), specifically:
+- Whether it can return a TaskModel whose status field is null
+- At what lifecycle points tasks are stored/returned and if status is guaranteed to be initialized.]]></request>
+    </requests>
+</response>
+```
