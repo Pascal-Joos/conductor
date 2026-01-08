@@ -40,6 +40,7 @@ import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
+import edu.ucr.cs.riple.annotator.util.Nullability;
 
 /** Used to parse and resolve the JSONPath bindings in the workflow and task definitions. */
 @Component
@@ -225,7 +226,7 @@ public class ParametersUtils {
             @Nullable String paramString,
             DocumentContext documentContext,
             @Nullable String taskId) {
-        String[] values = paramString.split("(?=(?<!\\$)\\$\\{)|(?<=})");
+        String[] values = Nullability.castToNonnull(paramString).split("(?=(?<!\\$)\\$\\{)|(?<=})");
         Object[] convertedValues = new Object[values.length];
         for (int i = 0; i < values.length; i++) {
             convertedValues[i] = values[i];
