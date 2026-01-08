@@ -27,8 +27,6 @@ import com.netflix.conductor.core.execution.evaluators.Evaluator;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
-import edu.ucr.cs.riple.annotator.util.Nullability;
-
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_INLINE;
 
 /**
@@ -81,8 +79,7 @@ public class Inline extends WorkflowSystemTask {
             checkEvaluatorType(evaluatorType);
             checkExpression(expression);
             Evaluator evaluator = evaluators.get(evaluatorType);
-            Object evalResult =
-                    Nullability.castToNonnull(evaluator).evaluate(expression, taskInput);
+            Object evalResult = evaluator.evaluate(expression, taskInput);
             task.addOutput("result", evalResult);
             task.setStatus(TaskModel.Status.COMPLETED);
         } catch (Exception e) {
