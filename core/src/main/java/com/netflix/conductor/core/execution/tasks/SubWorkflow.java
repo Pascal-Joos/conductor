@@ -29,7 +29,6 @@ import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.ucr.cs.riple.annotator.util.Nullability;
 
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_SUB_WORKFLOW;
 
@@ -52,7 +51,7 @@ public class SubWorkflow extends WorkflowSystemTask {
     @Override
     public void start(WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
         Map<String, Object> input = task.getInputData();
-        String name = Nullability.castToNonnull(input.get("subWorkflowName")).toString();
+        String name = input.get("subWorkflowName").toString();
         int version = (int) input.get("subWorkflowVersion");
 
         WorkflowDef workflowDefinition = null;
