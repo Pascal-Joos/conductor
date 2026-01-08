@@ -22,6 +22,8 @@ import com.netflix.conductor.core.execution.WorkflowExecutor;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
+import edu.ucr.cs.riple.annotator.util.Nullability;
+
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_JOIN;
 
 @Component(TASK_TYPE_JOIN)
@@ -44,11 +46,11 @@ public class Join extends WorkflowSystemTask {
         if (task.isLoopOverTask()) {
             // If join is part of loop over task, wait for specific iteration to get complete
             joinOn =
-                    joinOn.stream()
+                    Nullability.castToNonnull(joinOn).stream()
                             .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
                             .collect(Collectors.toList());
         }
-        for (String joinOnRef : joinOn) {
+        for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
             TaskModel forkedTask = workflow.getTaskByRefName(joinOnRef);
             if (forkedTask == null) {
                 // Task is not even scheduled yet
