@@ -104,8 +104,9 @@ public class DefaultEventQueueProcessor {
                                                     .filter(
                                                             task ->
                                                                     !task.getStatus().isTerminal()
-                                                                            && task.getTaskId()
-                                                                                    .equals(taskId))
+                                                                            && taskId.equals(
+                                                                                    task
+                                                                                            .getTaskId()))
                                                     .findFirst();
                                 } else if (StringUtils.isEmpty(taskRefName)) {
                                     LOGGER.error(
