@@ -29,6 +29,8 @@ import com.netflix.conductor.dao.MetadataDAO;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
+import edu.ucr.cs.riple.annotator.util.Nullability;
+
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_SUB_WORKFLOW;
 
 @Component
@@ -63,7 +65,7 @@ public class SubWorkflowTaskMapper implements TaskMapper {
         Map<String, Object> resolvedParams =
                 getSubWorkflowInputParameters(workflowModel, subWorkflowParams);
 
-        String subWorkflowName = resolvedParams.get("name").toString();
+        String subWorkflowName = Nullability.castToNonnull(resolvedParams.get("name")).toString();
         Integer subWorkflowVersion = getSubWorkflowVersion(resolvedParams, subWorkflowName);
 
         Object subWorkflowDefinition = resolvedParams.get("workflowDefinition");
