@@ -126,9 +126,9 @@ public class DefaultEventQueueProcessor {
                                                     .filter(
                                                             task ->
                                                                     !task.getStatus().isTerminal()
-                                                                            && task.getReferenceTaskName()
-                                                                                    .equals(
-                                                                                            taskRefName))
+                                                                            && taskRefName.equals(
+                                                                                    task
+                                                                                            .getReferenceTaskName()))
                                                     .findFirst();
                                 }
 

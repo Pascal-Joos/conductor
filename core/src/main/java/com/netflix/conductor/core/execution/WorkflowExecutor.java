@@ -1275,7 +1275,7 @@ public class WorkflowExecutor {
         workflow.getTasks()
                 .forEach(
                         task -> {
-                            if (task.getReferenceTaskName().equals(taskReferenceName)) {
+                            if (taskReferenceName.equals(task.getReferenceTaskName())) {
                                 String errorMsg =
                                         String.format(
                                                 "The task referenced %s has already been processed, cannot be skipped",

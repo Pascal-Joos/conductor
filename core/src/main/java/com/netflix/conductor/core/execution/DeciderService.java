@@ -482,11 +482,9 @@ public class DeciderService {
             // check if already has this DO_WHILE task, ignore it if it already exists
             String nextTaskReferenceName = taskToSchedule.getTaskReferenceName();
             if (workflow.getTasks().stream()
-                    .anyMatch(
-                            runningTask ->
-                                    runningTask
-                                            .getReferenceTaskName()
-                                            .equals(nextTaskReferenceName))) {
+                    .map(TaskModel::getReferenceTaskName)
+                    .filter(Objects::nonNull)
+                    .anyMatch(nextTaskReferenceName::equals)) {
                 return Collections.emptyList();
             }
         }
