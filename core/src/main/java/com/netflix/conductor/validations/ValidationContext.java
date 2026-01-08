@@ -29,7 +29,6 @@ public class ValidationContext {
         ValidationContext.metadataDAO = metadataDAO;
     }
 
-    @Nullable
     public static MetadataDAO getMetadataDAO() {
         return metadataDAO;
     }
