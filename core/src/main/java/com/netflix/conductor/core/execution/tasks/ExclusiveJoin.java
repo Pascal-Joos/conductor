@@ -24,8 +24,6 @@ import com.netflix.conductor.core.execution.WorkflowExecutor;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
-import edu.ucr.cs.riple.annotator.util.Nullability;
-
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_EXCLUSIVE_JOIN;
 
 @Component(TASK_TYPE_EXCLUSIVE_JOIN)
@@ -53,12 +51,12 @@ public class ExclusiveJoin extends WorkflowSystemTask {
             // If exclusive join is part of loop over task, wait for specific iteration to get
             // complete
             joinOn =
-                    Nullability.castToNonnull(joinOn).stream()
+                    joinOn.stream()
                             .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
                             .collect(Collectors.toList());
         }
         TaskModel exclusiveTask = null;
-        for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
+        for (String joinOnRef : joinOn) {
             LOGGER.debug("Exclusive Join On Task {} ", joinOnRef);
             exclusiveTask = workflow.getTaskByRefName(joinOnRef);
             if (exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
