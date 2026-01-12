@@ -24,6 +24,8 @@ import com.netflix.conductor.core.execution.WorkflowExecutor;
 import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 
+import edu.ucr.cs.riple.annotator.util.Nullability;
+
 import static com.netflix.conductor.common.metadata.tasks.TaskType.TASK_TYPE_EXCLUSIVE_JOIN;
 
 @Component(TASK_TYPE_EXCLUSIVE_JOIN)
@@ -115,7 +117,7 @@ public class ExclusiveJoin extends WorkflowSystemTask {
                 task.setReasonForIncompletion(failureReason.toString());
                 task.setStatus(TaskModel.Status.FAILED);
             } else {
-                task.setOutputData(exclusiveTask.getOutputData());
+                task.setOutputData(Nullability.castToNonnull(exclusiveTask).getOutputData());
                 task.setStatus(TaskModel.Status.COMPLETED);
             }
             LOGGER.debug("Task: {} status is: {}", task.getTaskId(), task.getStatus());
