@@ -635,7 +635,7 @@ public class DeciderService {
         long elapsedTime =
                 workflow.getLastRetriedTime() > 0
                         ? now - workflow.getLastRetriedTime()
-                        : now - workflow.getCreateTime();
+                        : now - Nullability.castToNonnull(workflow.getCreateTime());
 
         if (elapsedTime < timeout) {
             return;

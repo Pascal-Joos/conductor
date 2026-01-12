@@ -57,6 +57,8 @@ import com.netflix.conductor.model.TaskModel;
 import com.netflix.conductor.model.WorkflowModel;
 import com.netflix.conductor.service.ExecutionLockService;
 
+import edu.ucr.cs.riple.annotator.util.Nullability;
+
 import static com.netflix.conductor.core.utils.Utils.DECIDER_QUEUE;
 import static com.netflix.conductor.model.TaskModel.Status.*;
 
@@ -541,7 +543,7 @@ public class WorkflowExecutor {
         workflowStatusListener.onWorkflowCompletedIfEnabled(workflow);
         Monitors.recordWorkflowCompletion(
                 workflow.getWorkflowName(),
-                workflow.getEndTime() - workflow.getCreateTime(),
+                workflow.getEndTime() - Nullability.castToNonnull(workflow.getCreateTime()),
                 workflow.getOwnerApp());
 
         if (workflow.hasParent()) {
