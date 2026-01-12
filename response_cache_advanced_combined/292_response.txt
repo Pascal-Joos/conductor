@@ -1,0 +1,157 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private DeciderOutcome decide(final WorkflowModel workflow, List<TaskModel> preScheduledTasks)
+                throws TerminateWorkflowException {
+    
+            DeciderOutcome outcome = new DeciderOutcome();
+    
+            if (workflow.getStatus() != null && workflow.getStatus().isTerminal()) {
+                // you cannot evaluate a terminal workflow
+                LOGGER.debug(
+                        "Workflow {} is already finished. Reason: {}",
+                        workflow,
+                        workflow.getReasonForIncompletion());
+                return outcome;
+            }
+    
+            checkWorkflowTimeout(workflow);
+    
+            if (workflow.getStatus() != null
+                    && workflow.getStatus().equals(WorkflowModel.Status.PAUSED)) {
+                LOGGER.debug("Workflow " + workflow.getWorkflowId() + " is paused");
+                return outcome;
+            }
+    
+            List<TaskModel> pendingTasks = new ArrayList<>();
+            Set<String> executedTaskRefNames = new HashSet<>();
+            boolean hasSuccessfulTerminateTask = false;
+            for (TaskModel task : workflow.getTasks()) {
+    
+                TaskModel.Status taskStatus = task.getStatus();
+                if (!task.isRetried()
+                        && taskStatus != null
+                        && !taskStatus.equals(SKIPPED)
+                        && !task.isExecuted()) {
+                    pendingTasks.add(task);
+                }
+    
+                if (task.isExecuted()) {
+                    executedTaskRefNames.add(task.getReferenceTaskName());
+                }
+    
+                if (TERMINATE.name().equals(task.getTaskType())
+                        && taskStatus != null
+                        && taskStatus.isTerminal()
+                        && taskStatus.isSuccessful()) {
+                    hasSuccessfulTerminateTask = true;
+                    outcome.terminateTask = task;
+                }
+            }
+    
+            Map<String, TaskModel> tasksToBeScheduled = new LinkedHashMap<>();
+    
+            preScheduledTasks.forEach(
+                    preScheduledTask -> {
+                        tasksToBeScheduled.put(
+                                preScheduledTask.getReferenceTaskName(), preScheduledTask);
+                    });
+    
+            for (TaskModel pendingTask : pendingTasks) {
+    
+                if (systemTaskRegistry.isSystemTask(pendingTask.getTaskType())
+                        && pendingTask.getStatus() != null
+                        && !pendingTask.getStatus().isTerminal()) {
+                    tasksToBeScheduled.putIfAbsent(pendingTask.getReferenceTaskName(), pendingTask);
+                    executedTaskRefNames.remove(pendingTask.getReferenceTaskName());
+                }
+    
+                Optional<TaskDef> taskDefinition = pendingTask.getTaskDefinition();
+                if (taskDefinition.isEmpty()) {
+                    taskDefinition =
+                            Optional.ofNullable(
+                                            workflow.getWorkflowDefinition()
+                                                    .getTaskByRefName(
+                                                            pendingTask.getReferenceTaskName()))
+                                    .map(WorkflowTask::getTaskDefinition);
+                }
+    
+                if (taskDefinition.isPresent()) {
+                    checkTaskTimeout(taskDefinition.get(), pendingTask);
+                    checkTaskPollTimeout(taskDefinition.get(), pendingTask);
+                    if (isResponseTimedOut(taskDefinition.get(), pendingTask)) {
+                        timeoutTask(taskDefinition.get(), pendingTask);
+                    }
+                }
+    
+                if (pendingTask.getStatus() == null || !pendingTask.getStatus().isSuccessful()) {
+                    WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+                    if (workflowTask == null) {
+                        workflowTask =
+                                workflow.getWorkflowDefinition()
+                                        .getTaskByRefName(pendingTask.getReferenceTaskName());
+                    }
+    
+                    Optional<TaskModel> retryTask =
+                            retry(taskDefinition.orElse(null), workflowTask, pendingTask, workflow);
+                    if (retryTask.isPresent()) {
+                        tasksToBeScheduled.put(retryTask.get().getReferenceTaskName(), retryTask.get());
+                        executedTaskRefNames.remove(retryTask.get().getReferenceTaskName());
+                        outcome.tasksToBeUpdated.add(pendingTask);
+                    } else {
+                        pendingTask.setStatus(COMPLETED_WITH_ERRORS);
+                    }
+                }
+    
+                if (!pendingTask.isExecuted()
+                        && !pendingTask.isRetried()
+                        && pendingTask.getStatus() != null
+                        && pendingTask.getStatus().isTerminal()) {
+                    pendingTask.setExecuted(true);
+                    List<TaskModel> nextTasks = getNextTask(workflow, pendingTask);
+                    if (pendingTask.isLoopOverTask()
+                            && !TaskType.DO_WHILE.name().equals(pendingTask.getTaskType())
+                            && !nextTasks.isEmpty()) {
+                        nextTasks = filterNextLoopOverTasks(nextTasks, pendingTask, workflow);
+                    }
+                    nextTasks.forEach(
+                            nextTask ->
+                                    tasksToBeScheduled.putIfAbsent(
+                                            nextTask.getReferenceTaskName(), nextTask));
+                    outcome.tasksToBeUpdated.add(pendingTask);
+                    LOGGER.debug(
+                            "Scheduling Tasks from {}, next = {} for workflowId: {}",
+                            pendingTask.getTaskDefName(),
+                            nextTasks.stream()
+                                    .map(TaskModel::getTaskDefName)
+                                    .collect(Collectors.toList()),
+                            workflow.getWorkflowId());
+                }
+            }
+    
+            List<TaskModel> unScheduledTasks =
+                    tasksToBeScheduled.values().stream()
+                            .filter(task -> !executedTaskRefNames.contains(task.getReferenceTaskName()))
+                            .collect(Collectors.toList());
+            if (!unScheduledTasks.isEmpty()) {
+                LOGGER.debug(
+                        "Scheduling Tasks: {} for workflow: {}",
+                        unScheduledTasks.stream()
+                                .map(TaskModel::getTaskDefName)
+                                .collect(Collectors.toList()),
+                        workflow.getWorkflowId());
+                outcome.tasksToBeScheduled.addAll(unScheduledTasks);
+            }
+            if (hasSuccessfulTerminateTask
+                    || (outcome.tasksToBeScheduled.isEmpty() && checkForWorkflowCompletion(workflow))) {
+                LOGGER.debug("Marking workflow: {} as complete.", workflow);
+                outcome.isComplete = true;
+            }
+    
+            return outcome;
+}
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,68 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public boolean checkForWorkflowCompletion(final WorkflowModel workflow)
+            throws TerminateWorkflowException {
+
+        Map<String, TaskModel.Status> taskStatusMap = new HashMap<>();
+        List<TaskModel> nonExecutedTasks = new ArrayList<>();
+        for (TaskModel task : workflow.getTasks()) {
+            taskStatusMap.put(task.getReferenceTaskName(), task.getStatus());
+            if (!task.getStatus().isTerminal()) {
+                return false;
+            }
+
+            // If there is a TERMINATE task that has been executed successfuly then the workflow
+            // should be marked as completed.
+            if (TERMINATE.name().equals(task.getTaskType())
+                    && task.getStatus().isTerminal()
+                    && task.getStatus().isSuccessful()) {
+                return true;
+            }
+            if (!task.isRetried() || !task.isExecuted()) {
+                nonExecutedTasks.add(task);
+            }
+        }
+
+        // If there are no tasks executed, then we are not done yet
+        if (taskStatusMap.isEmpty()) {
+            return false;
+        }
+
+        WorkflowDef workflowDefinition =
+                Optional.ofNullable(workflow.getWorkflowDefinition())
+                        .orElseThrow(
+                                () ->
+                                        new TerminateWorkflowException(
+                                                "Missing workflow definition for workflow: "
+                                                        + workflow.getWorkflowId()));
+        List<WorkflowTask> workflowTasks = workflowDefinition.getTasks();
+
+        for (WorkflowTask wftask : workflowTasks) {
+            TaskModel.Status status = taskStatusMap.get(wftask.getTaskReferenceName());
+            if (status == null || !status.isTerminal()) {
+                return false;
+            }
+            // if we reach here, the task has been completed.
+            // Was the task successful in completion?
+            if (!status.isSuccessful()) {
+                return false;
+            }
+        }
+
+        boolean noPendingSchedule =
+                nonExecutedTasks.stream()
+                        .parallel()
+                        .noneMatch(
+                                wftask -> {
+                                    String next = getNextTasksToBeScheduled(workflow, wftask);
+                                    return next != null && !taskStatusMap.containsKey(next);
+                                });
+
+        return noPendingSchedule;
+}
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,82 @@
+<response>
+  <reason><![CDATA[
+The call site in question is inside `ForkJoinTaskMapper.getMappedTasks`:
+
+```java
+WorkflowTask joinWorkflowTask =
+        workflowModel
+                .getWorkflowDefinition()
+                .getNextTask(workflowTask.getTaskReferenceName());
+```
+
+Here, `workflowModel` is obtained from `taskMapperContext.getWorkflowModel()`. There is no guarantee anywhere in this method, or in `TaskMapperContext`, that `workflowModel.getWorkflowDefinition()` is non‑null.
+
+In contrast to other places in the codebase where `workflow.getWorkflowDefinition()` is guarded or defaulted (for example, via `Optional.ofNullable(workflow.getWorkflowDefinition()).orElseGet(...)` in `MetadataMapperService.populateWorkflowWithDefinitions`, or via a null-check in `DeciderService.getNextTasksToBeScheduled`), `ForkJoinTaskMapper` directly dereferences:
+
+```java
+workflowModel.getWorkflowDefinition().getNextTask(...)
+```
+
+with no preceding null check and no preceding call that would necessarily populate the definition. `TaskMapperContext` itself simply delegates:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowModel.getWorkflowDefinition();
+}
+```
+
+and does not enforce non‑nullity.
+
+Across the broader call graph, there are multiple usages where `getWorkflowDefinition()` is explicitly treated as potentially null:
+
+- `DeciderService.getNextTasksToBeScheduled`:
+
+  ```java
+  final WorkflowDef def = workflow.getWorkflowDefinition();
+  if (def == null) {
+      return null;
+  }
+  ```
+
+- `DeciderService.getNextTask`:
+
+  ```java
+  final WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef == null) {
+      return Collections.emptyList();
+  }
+  ```
+
+- `DeciderService.checkWorkflowTimeout`:
+
+  ```java
+  WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef == null) {
+      LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+      return;
+  }
+  ```
+
+- `WorkflowStatusListener.onWorkflowCompletedIfEnabled`:
+
+  ```java
+  WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef != null && workflowDef.isWorkflowStatusListenerEnabled()) { ... }
+  ```
+
+These usages prove that `workflow.getWorkflowDefinition()` is allowed and expected to be null at runtime in at least some situations; otherwise these explicit null checks would be unnecessary.
+
+Nothing in the provided `ForkJoinTaskMapper.getMappedTasks` implementation or its immediate call chain guarantees that `MetadataMapperService.populateWorkflowWithDefinitions(workflow)` or an equivalent initializer has already been invoked on the particular `WorkflowModel` instance before reaching the fork/join mapping logic. The `DeciderService.getTasksToBeScheduled(...)` called earlier in the method also does not enforce non‑null `workflowDefinition`; it calls `parametersUtils.getTaskInput(...)`, and `ParametersUtils.getTaskInput` itself assumes `workflow.getWorkflowDefinition()` is non‑null and will throw if it is null, but that is precisely evidence that a null `workflowDefinition` is *possible* and would cause a runtime failure, not that it is prevented by design.
+
+Therefore, at this call site
+
+```java
+workflowModel.getWorkflowDefinition()
+```
+
+the return value `workflowModel.getWorkflowDefinition()` can legally be `null` according to the surrounding codebase conventions and existing null checks elsewhere. In such a case, this line would cause a `NullPointerException` when `.getNextTask(...)` is invoked, which is still consistent with the fact that the method `getWorkflowDefinition()` itself can return null.
+
+Because the question is strictly about whether `getWorkflowDefinition()` *can* return null at this call site (not whether a downstream NPE will occur), the answer is that it can.
+]]></reason>
+  <value>YES</value>
+</response>

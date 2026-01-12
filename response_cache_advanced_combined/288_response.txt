@@ -1,0 +1,52 @@
+<response>
+  <reason><![CDATA[
+The call site in question is inside `DeciderService.isTaskSkipped`:
+
+```java
+private boolean isTaskSkipped(WorkflowTask taskToSchedule, WorkflowModel workflow) {
+    try {
+        boolean isTaskSkipped = false;
+        if (taskToSchedule != null) {
+            TaskModel t = workflow.getTaskByRefName(taskToSchedule.getTaskReferenceName());
+            if (t == null) {
+                isTaskSkipped = false;
+            } else if (t.getStatus().equals(SKIPPED)) {
+                isTaskSkipped = true;
+            }
+        }
+        return isTaskSkipped;
+    } catch (Exception e) {
+        throw new TerminateWorkflowException(e.getMessage());
+    }
+}
+```
+
+Here `t` is a `TaskModel` obtained from `workflow.getTaskByRefName(...)`. The code explicitly checks `if (t == null)` and only proceeds to `t.getStatus().equals(SKIPPED)` in the `else if` branch, i.e., only when `t` is guaranteed non-null.
+
+However, `TaskModel.getStatus()` simply returns the field `status`:
+
+```java
+public Status getStatus() {
+    return status;
+}
+```
+
+There is no guarantee in the shown code that `status` is always non-null. In fact, several places in the codebase explicitly guard against or allow `null` status, e.g.:
+
+- `if (task != null && task.getStatus() != null && task.getStatus().isTerminal()) { ... }`
+- `if (pendingTask.getStatus() == null || !pendingTask.getStatus().isSuccessful()) { ... }`
+- `if (taskStatus == null || !taskStatus.isTerminal()) { return false; }` in `checkForWorkflowCompletion`.
+
+These patterns demonstrate that `TaskModel.status` is allowed to be `null` and is treated as such in normal control flow. That means, for some `TaskModel` instances, `status` may indeed be `null` at runtime.
+
+At this specific call site, we only know that `t != null`; there is no preceding check that `t.getStatus()` is non-null. Therefore, it is entirely possible that:
+
+- `t` is non-null,
+- `t.getStatus()` returns `null`,
+
+and then the expression `t.getStatus().equals(SKIPPED)` would actually throw a `NullPointerException`. But from the perspective of the `getStatus()` method itself, this shows that `getStatus()` can and does return `null`.
+
+Since the question is strictly about whether `t.getStatus()` can return `null` at this call site, not about whether that `null` is safely handled, the answer is yes: the `status` field is nullable in practice, and no invariants here prevent it from being null when `isTaskSkipped` is executed. Thus `getStatus()` can return `null` at this location.
+  ]]></reason>
+  <value>YES</value>
+</response>

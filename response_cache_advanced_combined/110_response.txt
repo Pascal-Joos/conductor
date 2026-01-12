@@ -1,0 +1,34 @@
+```xml
+<response>
+    <reason><![CDATA[
+Within the provided method, the only explicit null check around `forkedTask` is:
+
+    TaskModel forkedTask = workflow.getTaskByRefName(joinOnRef);
+    if (forkedTask == null) {
+        // Task is not even scheduled yet
+        allDone = false;
+        break;
+    }
+
+This guarantees that, along any path that reaches the line:
+
+    if (forkedTask.getWorkflowTask().isOptional()
+
+`forkedTask` itself is non-null.
+
+However, that does not guarantee that `forkedTask.getWorkflowTask()` is non-null. There is no null check on `forkedTask.getWorkflowTask()` before it is dereferenced, and there is nothing in this method alone that establishes a non-null invariant for `getWorkflowTask()`.
+
+Whether `forkedTask.getWorkflowTask()` can be null depends on the contract and implementation of `TaskModel` and how tasks are constructed/populated in the broader system:
+
+- If the `TaskModel` class (or its builder/factory) *guarantees* that every `TaskModel` returned by `workflow.getTaskByRefName(...)` always has a non-null `WorkflowTask` (e.g., enforced via constructor, validation, or framework contracts), then `getWorkflowTask()` would not be null.
+- If no such guarantee exists and `WorkflowTask` is an optional association that may be absent (or lazily attached and possibly missing), then `getWorkflowTask()` can be null and this line would be a potential NPE site.
+
+Since the implementation and invariants of `TaskModel.getWorkflowTask()` and `WorkflowModel.getTaskByRefName(...)` are not provided, this method alone is insufficient to prove non-nullness. The possibility of null cannot be ruled out based solely on the shown code.]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the implementation or documented contract of TaskModel.getWorkflowTask().]]></request>
+        <request><![CDATA[Provide the implementation or documented contract of WorkflowModel.getTaskByRefName(String).]]></request>
+        <request><![CDATA[Indicate whether the system guarantees that every TaskModel in a WorkflowModel always has a non-null WorkflowTask.]]></request>
+    </requests>
+</response>
+```

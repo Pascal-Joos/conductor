@@ -1,0 +1,19 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  @Override
+  public int hashCode() {
+      int result = getWorkflowDefinition() == null ? 1 : getWorkflowDefinition().hashCode();
+      result = 31 * result + (getWorkflowModel() == null ? 1 : getWorkflowModel().hashCode());
+      result = 31 * result + (getWorkflowTask() == null ? 1 : getWorkflowTask().hashCode());
+      result = 31 * result + (getTaskInput() == null ? 1 : getTaskInput().hashCode());
+      result = 31 * result + getRetryCount();
+      result = 31 * result + (getRetryTaskId() != null ? getRetryTaskId().hashCode() : 0);
+      result = 31 * result + (getTaskId() == null ? 1 : getTaskId().hashCode());
+      return result;
+  }
+  ```
+    ]]>
+  </code>
+</response>

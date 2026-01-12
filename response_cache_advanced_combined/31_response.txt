@@ -1,0 +1,40 @@
+```xml
+<response>
+    <reason><![CDATA[
+The local variable `joinOn` is initialized as:
+
+    List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+There are no null-checks or default assignments before it is used in:
+
+    for (String joinOnRef : joinOn) {
+
+The only subsequent reassignment is:
+
+    if (task.isLoopOverTask()) {
+        joinOn =
+                joinOn.stream()
+                      .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
+                      .collect(Collectors.toList());
+    }
+
+This call to `joinOn.stream()` itself will throw a `NullPointerException` if `joinOn` is null, but it does not *prevent* `joinOn` from being null; it simply means that if `joinOn` is null and `task.isLoopOverTask()` is true, the method will fail before reaching the `for` loop.
+
+Whether `joinOn` *can* be null depends on the behavior of `task.getInputData().get("joinOn")`:
+- `task.getInputData()` is presumably a `Map<String, Object>`.
+- The `Map.get(key)` contract explicitly allows returning `null` if the key is not present or if the value associated with the key is null.
+- There is no evidence in this method that the presence or non-nullness of `"joinOn"` is guaranteed, nor is there a defensive check (`Objects.requireNonNull`, explicit null-check, or substitution of an empty list).
+
+Therefore, from the perspective of this method alone, the expression `joinOn` at `for (String joinOnRef : joinOn)` can indeed be null if:
+- The input map does not contain `"joinOn"`, or
+- It contains `"joinOn"` mapped to `null`.
+
+In those scenarios:
+- If `task.isLoopOverTask()` is false, the `for` loop line will throw a `NullPointerException` when trying to iterate a null `joinOn`.
+- If `task.isLoopOverTask()` is true, a `NullPointerException` will occur earlier at `joinOn.stream()`.
+
+Since the method does not enforce any invariant that `joinOn` must be non-null, and standard `Map` semantics permit null, the expression can be null.
+    ]]></reason>
+    <value>YES</value>
+</response>
+```

@@ -1,0 +1,37 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  @VisibleForTesting
+      boolean verifyAndRepairTask(TaskModel task) {
+          if (isTaskRepairable.test(task)) {
+              // Ensure QueueDAO contains this taskId
+              String taskQueueName = QueueUtils.getQueueName(task);
+              if (!queueDAO.containsMessage(Nullability.castToNonnull(taskQueueName), task.getTaskId())) {
+                  queueDAO.push(taskQueueName, task.getTaskId(), task.getCallbackAfterSeconds());
+                  LOGGER.info(
+                          "Task {} in workflow {} re-queued for repairs",
+                          task.getTaskId(),
+                          task.getWorkflowInstanceId());
+                  Monitors.recordQueueMessageRepushFromRepairService(task.getTaskDefName());
+                  return true;
+              }
+          } else if (task.getTaskType().equals(TaskType.TASK_TYPE_SUB_WORKFLOW)
+                  && task.getStatus() == TaskModel.Status.IN_PROGRESS) {
+              WorkflowModel subWorkflow = executionDAO.getWorkflow(task.getSubWorkflowId(), false);
+              if (subWorkflow.getStatus().isTerminal()) {
+                  LOGGER.info(
+                          "Repairing sub workflow task {} for sub workflow {} in workflow {}",
+                          task.getTaskId(),
+                          task.getSubWorkflowId(),
+                          task.getWorkflowInstanceId());
+                  repairSubWorkflowTask(task, subWorkflow);
+                  return true;
+              }
+          }
+          return false;
+  }
+  ```
+    ]]>
+  </code>
+</response>

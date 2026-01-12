@@ -1,0 +1,79 @@
+<response>
+  <reason><![CDATA[
+At this call site, `doWhileTaskModel` is a `TaskModel` representing a `DO_WHILE` system task.
+
+The method in question is:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+`workflowTask` is just a field; there is no guarantee in this class that it is initialized non‑null.
+
+Looking at the usages around the call site in `DoWhile`:
+
+```java
+LOGGER.debug(
+    "Scheduling loop tasks for task {} as condition {} evaluated to true",
+    doWhileTaskModel.getTaskId(),
+    Optional.ofNullable(doWhileTaskModel.getWorkflowTask())
+            .map(WorkflowTask::getLoopCondition)
+            .orElse(null));
+...
+if (Optional.ofNullable(doWhileTaskModel.getWorkflowTask())
+        .map(workflowTask -> workflowTask.has(...))
+        .orElse(false)) { ... }
+
+boolean shouldContinue;
+try {
+    shouldContinue = evaluateCondition(workflow, doWhileTaskModel);
+    ...
+} catch (ScriptException e) {
+    String message =
+            String.format(
+                    "Unable to evaluate condition %s, exception %s",
+                    Optional.ofNullable(doWhileTaskModel)
+                            .map(TaskModel::getWorkflowTask)
+                            .map(WorkflowTask::getLoopCondition)
+                            .orElse(null),
+                    e.getMessage());
+    ...
+}
+```
+
+These usages explicitly wrap `doWhileTaskModel.getWorkflowTask()` in `Optional.ofNullable(...)` and safely handle the null case (by falling back to `null` or `false`). This pattern strongly indicates that `getWorkflowTask()` is *expected* to be possibly null.
+
+Elsewhere in the codebase, `TaskModel` instances are sometimes created or received without a `workflowTask`:
+
+- In `WorkflowExecutor.getTask(String taskId)`:
+
+  ```java
+  return Optional.ofNullable(executionDAOFacade.getTaskModel(taskId))
+      .map(task -> {
+          if (task.getWorkflowTask() != null) {
+              return metadataMapperService.populateTaskWithDefinition(task);
+          }
+          return task;
+      })
+      .orElse(null);
+  ```
+
+  This shows tasks can exist with `getWorkflowTask() == null`; when that happens, the task is simply returned as‑is, with no attempt to populate `workflowTask`.
+
+- In multiple places (e.g., `DeciderService.decide`, `WorkflowExecutor.scheduleNextIteration`), the code defensively does:
+
+  ```java
+  WorkflowTask workflowTask = Optional.ofNullable(task.getWorkflowTask())
+      .orElseGet(() -> workflow.getWorkflowDefinition().getTaskByRefName(...));
+  ```
+
+Again, this fallback is used exactly because `task.getWorkflowTask()` may be null.
+
+Crucially, no provided code enforces that `doWhileTaskModel.workflowTask` is non‑null at the time `scheduleNextIteration` or other DoWhile methods run. It is entirely possible for a `DO_WHILE` task to be loaded from storage or constructed without the `workflowTask` field being set, and the rest of the code is written to tolerate that.
+
+Therefore, for the specific call site `doWhileTaskModel.getWorkflowTask()`, the result can legitimately be `null`. The surrounding code already anticipates and handles that scenario using `Optional.ofNullable`.
+  ]]></reason>
+  <value>YES</value>
+</response>

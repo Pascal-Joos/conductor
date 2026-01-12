@@ -1,0 +1,56 @@
+<response>
+  <reason><![CDATA[
+The method `TaskModel.getWorkflowTask()` simply returns the field `workflowTask` and does not enforce non-nullity:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+From the provided call chain, we can see multiple usages that explicitly treat `getWorkflowTask()` as possibly null, confirming there is no global invariant guaranteeing it is non-null:
+
+- In `MetadataMapperService.populateTaskWithDefinition`:
+  ```java
+  populateWorkflowTaskWithDefinition(task.getWorkflowTask());
+  ```
+  is called without a null-check, but this only means it *assumes* non-null for those particular tasks; it does not establish a global guarantee.
+
+- In `WorkflowExecutor.getTask`:
+  ```java
+  if (task.getWorkflowTask() != null) {
+      return metadataMapperService.populateTaskWithDefinition(task);
+  }
+  return task;
+  ```
+  This clearly shows `task.getWorkflowTask()` may be null for some `TaskModel` instances.
+
+- In `WorkflowExecutor.scheduleNextIteration`:
+  ```java
+  WorkflowTask workflowTask =
+      Optional.ofNullable(loopTask.getWorkflowTask())
+              .orElseGet(() ->
+                  workflow.getWorkflowDefinition()
+                          .getTaskByRefName(loopTask.getReferenceTaskName()));
+  if (workflowTask == null || workflowTask.getLoopOver() == null || workflowTask.getLoopOver().isEmpty()) {
+      return;
+  }
+  ```
+  Here the code explicitly handles the case where `loopTask.getWorkflowTask()` is null and even where no definition can be found, leaving `workflowTask` null.
+
+- In `DeciderService.decide`:
+  ```java
+  WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+  if (workflowTask == null) {
+      workflowTask =
+          workflow.getWorkflowDefinition()
+                  .getTaskByRefName(pendingTask.getReferenceTaskName());
+  }
+  ```
+  Again, `getWorkflowTask()` is explicitly treated as possibly null.
+
+Because `workflowTask` can be null on a `TaskModel`, and `getWorkflowTask()` is just a direct field accessor with no checks or defaulting, there is no guarantee at this specific call site (`task.getWorkflowTask()`) that the result will be non-null. In fact, several parts of the codebase rely on it being potentially null and contain fallback logic.
+
+Therefore, at this call site, `task.getWorkflowTask()` **can** return null.]]></reason>
+  <value>YES</value>
+</response>

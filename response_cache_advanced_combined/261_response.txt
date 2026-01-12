@@ -1,0 +1,52 @@
+<response>
+  <reason><![CDATA[
+At this specific call site, `doWhileTaskModel` is a `TaskModel` instance representing a DO_WHILE system task. The invocation in question appears multiple times in `DoWhile`:
+
+- `doWhileTaskModel.getWorkflowTask().getLoopCondition()` in `scheduleNextIteration`
+- `Optional.ofNullable(doWhileTaskModel.getWorkflowTask())...` (explicitly handling null)
+- `doWhileTaskModel.getWorkflowTask().getLoopOver()` in `isIterationComplete`
+- `task.getWorkflowTask().getInputParameters()` and `task.getWorkflowTask().getLoopCondition()` in `evaluateCondition`
+
+The compiler allows these dereferences because `getWorkflowTask()` is typed as `WorkflowTask`, but there are no guarantees in the `TaskModel` implementation that `workflowTask` is non-null. In fact, other parts of the codebase treat it as nullable:
+
+- `getTaskDefinition()` is explicitly written as:
+  ```java
+  public Optional<TaskDef> getTaskDefinition() {
+      return Optional.ofNullable(this.getWorkflowTask())
+                     .map(WorkflowTask::getTaskDefinition);
+  }
+  ```
+  This shows that `getWorkflowTask()` may return null.
+
+- In `WorkflowExecutor.getTask`:
+  ```java
+  if (task.getWorkflowTask() != null) {
+      return metadataMapperService.populateTaskWithDefinition(task);
+  }
+  return task;
+  ```
+  Again, `getWorkflowTask()` is checked against null, implying it can be null.
+
+- In `DeciderService.decide`:
+  ```java
+  WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+  if (workflowTask == null) {
+      workflowTask = workflow.getWorkflowDefinition()
+                             .getTaskByRefName(pendingTask.getReferenceTaskName());
+  }
+  ```
+  Here, the code explicitly handles the case where `pendingTask.getWorkflowTask()` is null.
+
+Nothing in the provided control flow for the `DoWhile` system task shows that `doWhileTaskModel` is always constructed or populated with a non-null `workflowTask` before the calls in `DoWhile`. The scheduler and decider logic operate on `TaskModel` instances where `workflowTask` may or may not be set, and other code must defensively fetch the `WorkflowTask` from the `WorkflowDefinition` when it is missing.
+
+Because:
+
+1. `TaskModel.workflowTask` is not initialized or enforced to be non-null anywhere in the shown code,
+2. Multiple callers treat `getWorkflowTask()` as potentially null and branch on that,
+3. There is no path-specific guarantee that `doWhileTaskModel` has been through a method like `populateTaskWithDefinition` that would ensure `workflowTask` is set,
+
+the specific call `doWhileTaskModel.getWorkflowTask()` can evaluate to `null` at runtime in this codebase. If it is null at the `DoWhile` call sites that immediately dereference it (e.g., `.getLoopCondition()` or `.getLoopOver()`), a `NullPointerException` would result; but the question is about the possibility of a null return value, and that possibility clearly exists.
+
+Therefore, at this specific call site, `getWorkflowTask()` can return null.]]></reason>
+  <value>YES</value>
+</response>

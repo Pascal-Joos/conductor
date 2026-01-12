@@ -1,0 +1,47 @@
+<response>
+  <reason><![CDATA[
+At the call site in ExclusiveJoin.execute:
+
+```java
+TaskModel exclusiveTask = null;
+for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
+    exclusiveTask = workflow.getTaskByRefName(joinOnRef);
+    if (exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+        continue;
+    }
+    taskStatus = exclusiveTask.getStatus();
+    ...
+    break;
+}
+```
+
+we only reach `taskStatus = exclusiveTask.getStatus();` inside the loop after the condition:
+
+```java
+if (exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+    continue;
+}
+```
+
+has evaluated to false. This guarantees:
+
+1. `exclusiveTask != null` (otherwise the first disjunct `exclusiveTask == null` would be true and the loop would `continue` before the assignment).
+2. `exclusiveTask.getStatus() != SKIPPED` (because the second disjunct would be true if it were SKIPPED, again leading to `continue`).
+
+However, this guard does **not** ensure that `exclusiveTask.getStatus()` is non‑null. The comparison `exclusiveTask.getStatus() == TaskModel.Status.SKIPPED` is safe even if `getStatus()` returns null, because a null reference can be compared with `==` to an enum constant; the result is simply `false` and no NullPointerException is thrown. Therefore:
+
+- If `exclusiveTask.getStatus()` is `null`, the condition
+  ```java
+  exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED
+  ```
+  evaluates to `false || false` → `false`, the `continue` is not executed, and control flows to:
+  ```java
+  taskStatus = exclusiveTask.getStatus();
+  ```
+- In this case, `exclusiveTask.getStatus()` evaluates to `null`, so `taskStatus` is assigned `null`.
+
+Nothing in the provided codebase enforces that `status` in `TaskModel` is always non‑null at this point. In multiple other places in the code, checks of the form `if (task.getStatus() != null && ...)` are used, which explicitly acknowledge that `status` can be null. Thus it is entirely possible for `exclusiveTask.getStatus()` to be null when this call is made, and the assignment will receive a null value.
+
+Therefore, at this specific call site, the invocation `exclusiveTask.getStatus()` can indeed return null.]]></reason>
+  <value>YES</value>
+</response>

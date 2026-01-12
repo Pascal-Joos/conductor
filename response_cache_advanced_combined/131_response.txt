@@ -1,0 +1,10 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  private static final Predicate<TaskModel> NON_TERMINAL_TASK =
+          task -> task.getStatus() != null && !task.getStatus().isTerminal();
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,48 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+@VisibleForTesting
+    boolean evaluateCondition(WorkflowModel workflow, TaskModel task) throws ScriptException {
+        TaskDef taskDefinition = task.getTaskDefinition().orElse(null);
+        // Use paramUtils to compute the task input
+        Map<String, Object> conditionInput =
+                parametersUtils.getTaskInputV2(
+                        task.getWorkflowTask().getInputParameters(),
+                        workflow,
+                        task.getTaskId(),
+                        taskDefinition);
+        conditionInput.put(task.getReferenceTaskName(), task.getOutputData());
+        List<TaskModel> loopOver =
+                workflow.getTasks().stream()
+                        .filter(
+                                tttt ->
+                                        (task.getWorkflowTask()
+                                                        .has(
+                                                                TaskUtils
+                                                                        .removeIterationFromTaskRefName(
+                                                                                tttt
+                                                                                        .getReferenceTaskName()))
+                                                && !task.getReferenceTaskName()
+                                                        .equals(tttt.getReferenceTaskName())))
+                        .collect(Collectors.toList());
+
+        for (TaskModel loopOverTask : loopOver) {
+            conditionInput.put(
+                    TaskUtils.removeIterationFromTaskRefName(loopOverTask.getReferenceTaskName()),
+                    loopOverTask.getOutputData());
+        }
+
+        String condition = task.getWorkflowTask().getLoopCondition();
+        boolean result = false;
+        if (condition != null) {
+            LOGGER.debug("Condition: {} is being evaluated", condition);
+            // Evaluate the expression by using the Nashorn based script evaluator
+            result = ScriptEvaluator.evalBool(condition, conditionInput);
+        }
+        return result;
+}
+  ```
+    ]]>
+  </code>
+</response>

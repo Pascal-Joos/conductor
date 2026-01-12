@@ -1,0 +1,44 @@
+```xml
+<response>
+    <reason><![CDATA[
+The local variable `joinOn` is initialized from task input:
+
+    List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+`task.getInputData().get("joinOn")` can legally return `null` if:
+- the "joinOn" key is absent, or
+- the value is explicitly `null`.
+
+There is no null check before `joinOn` is later used. Instead, the code uses:
+
+    if (task.isLoopOverTask()) {
+        joinOn =
+                Nullability.castToNonnull(joinOn).stream()
+                        .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
+                        .collect(Collectors.toList());
+    }
+
+and then, regardless of whether `isLoopOverTask()` is true or false, executes:
+
+    for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
+
+Therefore, the null-safety of `joinOn` entirely depends on what `Nullability.castToNonnull(joinOn)` guarantees.
+
+- If `Nullability.castToNonnull` is just a compile-time/annotation helper or a simple unchecked cast that assumes non-null and does not handle `null` at runtime, then `joinOn` can be `null` at runtime and this will cause a `NullPointerException` inside `castToNonnull`. In that sense, `joinOn` is not guaranteed non-null by the surrounding logic.
+- The method itself does *not* contain any conditional logic or defensive checks (e.g., `if (joinOn == null) { ... }`) that would prevent `joinOn` from being `null` before the `for` loop.
+
+Because the implementation and contract of `Nullability.castToNonnull` are not shown here, we cannot be certain that it transforms a `null` value into a non-null empty list or otherwise guarantees non-null at runtime. Without that knowledge, we cannot assert that `joinOn` is definitely non-null at the point of use.
+
+Hence, from the given method alone, it is not possible to conclude that `joinOn` can never be `null`; that depends on external contracts for:
+- `task.getInputData()` (whether "joinOn" is always present and non-null),
+- and `Nullability.castToNonnull` (whether it tolerates `null` and returns a safe non-null value).
+    ]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[
+Provide the contract or implementation of Nullability.castToNonnull, especially its behavior when passed a null reference.]]></request>
+        <request><![CDATA[
+Provide any documented guarantees or validation that ensure task.getInputData().get("joinOn") is always non-null for this task type.]]></request>
+    </requests>
+</response>
+```

@@ -1,0 +1,15 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public static String getQueueName(TaskModel taskModel) {
+        return getQueueName(
+                Nullability.castToNonnull(taskModel.getTaskType()),
+                taskModel.getDomain(),
+                taskModel.getIsolationGroupId(),
+                taskModel.getExecutionNameSpace());
+}
+  ```
+    ]]>
+  </code>
+</response>

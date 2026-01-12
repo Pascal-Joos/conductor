@@ -1,0 +1,49 @@
+<response>
+  <reason><![CDATA[
+At this call site, `runningTask.getReferenceTaskName()` is invoked inside a stream over the workflow’s tasks:
+
+```java
+Optional<String> existingTaskRefName =
+        workflowModel.getTasks().stream()
+                .filter(
+                        runningTask ->
+                                runningTask
+                                                .getStatus()
+                                                .equals(TaskModel.Status.IN_PROGRESS)
+                                        || runningTask.getStatus().isTerminal())
+                .map(TaskModel::getReferenceTaskName)
+                .filter(
+                        refTaskName ->
+                                refTaskName.equals(
+                                        dynForkTask.getTaskReferenceName()))
+                .findAny();
+```
+
+Key points:
+
+1. `getReferenceTaskName()` simply returns the field:
+   ```java
+   public String getReferenceTaskName() {
+       return referenceTaskName;
+   }
+   ```
+   so it *can* be `null` if `referenceTaskName` has not been set.
+
+2. In this particular context, there is **no preceding null-check** or invariant that prevents `referenceTaskName` from being `null` on `runningTask`. The stream is iterating over `workflowModel.getTasks()`, which may include tasks with `referenceTaskName == null`.
+
+3. Elsewhere, `WorkflowModel.getTaskByRefName` explicitly checks for and throws if it encounters a task with `null` reference name:
+   ```java
+   if (task.getReferenceTaskName() == null) {
+       throw new RuntimeException("Task ... does not have reference name specified.");
+   }
+   ```
+   This proves that the codebase considers `referenceTaskName` potentially `null` on some `TaskModel` instances; it is not globally guaranteed non-null.
+
+4. The presence of that runtime check does **not** ensure that all tasks in `workflowModel.getTasks()` always have non-null reference names; it only enforces non-nullity along the specific path where `getTaskByRefName` is used. The current call site is a direct field access via the getter and does not go through `getTaskByRefName`, so it does not benefit from that guard.
+
+5. Therefore, for some `runningTask` in the stream, `referenceTaskName` may still be `null`, and `runningTask.getReferenceTaskName()` will return `null` at this call site (which would later cause a `NullPointerException` when `.equals(...)` is called on it in the subsequent filter, but that is still a `null` return from this getter).
+
+Because nothing in the shown code guarantees non-nullity of `referenceTaskName` for all `runningTask` instances reaching this line, the method **can** return `null` at this specific call site.
+]]></reason>
+  <value>YES</value>
+</response>

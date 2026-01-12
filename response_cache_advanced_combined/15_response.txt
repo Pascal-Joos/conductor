@@ -1,0 +1,6 @@
+<response>
+    <reason><![CDATA[
+The method name `withWorkflowTask` does not match any of the recognized initializer patterns described (it does not start with `init` or `initialize` and is not a known lifecycle/init method like `onCreate` or `init` from the listed frameworks). Its behavior—taking a value and assigning it to a single field, then returning `this`—matches a typical builder-style setter, which you explicitly do not want to treat as an initializer method. Therefore, under the given criteria, it should be classified as a setter-like method, not an initializer method for NullAway.
+    ]]></reason>
+    <value>NO</value>
+</response>

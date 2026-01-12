@@ -1,0 +1,28 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  public TaskDef getTaskDefinition(TaskModel task) {
+        return task.getTaskDefinition()
+                .orElseGet(
+                        () ->
+                                Optional.ofNullable(task.getWorkflowTask())
+                                        .map(WorkflowTask::getName)
+                                        .map(metadataDAO::getTaskDef)
+                                        .orElseThrow(
+                                                () -> {
+                                                    String reason =
+                                                            String.format(
+                                                                    "Invalid task specified. Cannot find task by name %s in the task definitions",
+                                                                    Optional.ofNullable(
+                                                                                    task
+                                                                                            .getWorkflowTask())
+                                                                            .map(WorkflowTask::getName)
+                                                                            .orElse("null"));
+                                                    return new TerminateWorkflowException(reason);
+                                                }));
+  }
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,34 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private WorkflowModel terminate(
+            final WorkflowModel workflow, TerminateWorkflowException terminateWorkflowException) {
+        if (!workflow.getStatus().isTerminal()) {
+            workflow.setStatus(terminateWorkflowException.getWorkflowStatus());
+        }
+
+        if (terminateWorkflowException.getTask() != null && workflow.getFailedTaskId() == null) {
+            workflow.setFailedTaskId(terminateWorkflowException.getTask().getTaskId());
+        }
+
+        String failureWorkflow = Optional.ofNullable(workflow.getWorkflowDefinition())
+                .map(WorkflowDef::getFailureWorkflow)
+                .orElse(null);
+        if (failureWorkflow != null) {
+            if (failureWorkflow.startsWith("$")) {
+                String[] paramPathComponents = failureWorkflow.split("\\.");
+                String name = paramPathComponents[2]; // name of the input parameter
+                failureWorkflow = (String) workflow.getInput().get(name);
+            }
+        }
+        if (terminateWorkflowException.getTask() != null) {
+            executionDAOFacade.updateTask(terminateWorkflowException.getTask());
+        }
+        return terminateWorkflow(
+                workflow, terminateWorkflowException.getMessage(), failureWorkflow);
+}
+  ```
+    ]]>
+  </code>
+</response>

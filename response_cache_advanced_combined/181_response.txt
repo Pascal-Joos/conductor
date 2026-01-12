@@ -1,0 +1,4 @@
+<response>
+    <reason><![CDATA[According to your criteria, initializer methods are either known framework lifecycle methods (e.g., onCreate, init) or methods whose names start with "init" or "initialize" and are not setters. The given method is named setWorkflowDefinition, clearly follows the JavaBeans setter pattern (name starts with "set" and takes a single parameter assigned directly to a field), and thus should be treated as a regular setter, not an initializer method for NullAway’s purposes.]]></reason>
+    <value>NO</value>
+</response>

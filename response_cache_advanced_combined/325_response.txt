@@ -1,0 +1,58 @@
+<response>
+  <reason><![CDATA[
+At this call site, `workflow` is an instance of `WorkflowModel`, and `getWorkflowDefinition()` simply returns the `workflowDefinition` field:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowDefinition;
+}
+```
+
+Across the provided call chain, nothing guarantees that `workflowDefinition` is always non-null when `workflow.getWorkflowDefinition()` is invoked. In fact, multiple usages explicitly treat it as potentially null and fall back to metadata lookups:
+
+- In `DeciderService.getNextTasksToBeScheduled`:
+  ```java
+  final WorkflowDef def = workflow.getWorkflowDefinition();
+  if (def == null) {
+      return null;
+  }
+  ```
+  This shows the definition can be null at call time.
+
+- In `DeciderService.checkWorkflowTimeout`:
+  ```java
+  WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef == null) {
+      LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+      return;
+  }
+  ```
+  Again, null is anticipated.
+
+- In `ParametersUtils.getTaskInput`:
+  ```java
+  if (workflow.getWorkflowDefinition().getSchemaVersion() > 1) {
+      ...
+  }
+  ```
+  Here, no null-check is done; a missing definition would cause a `NullPointerException`, not be prevented by invariants shown in the code you provided.
+
+There are also paths (e.g., in `WorkflowExecutor.decide(WorkflowModel workflow)`, `WorkflowSweeper.sweep`, various mapper usage via `TaskMapperContext`) where a `WorkflowModel` is received from persistence and passed through without any prior call to `MetadataMapperService.populateWorkflowWithDefinitions(workflow)`. The presence of `populateWorkflowWithDefinitions` itself, which does:
+
+```java
+WorkflowDef workflowDefinition =
+    Optional.ofNullable(workflow.getWorkflowDefinition())
+            .orElseGet(() -> {
+                WorkflowDef wd = lookupForWorkflowDefinition(...);
+                workflow.setWorkflowDefinition(wd);
+                return wd;
+            });
+```
+
+demonstrates that `workflowDefinition` is expected to be initially null in some cases and then filled.
+
+Because no global invariant is established that "every `WorkflowModel` reaching this particular call site has already been populated with a non-null `workflowDefinition`", and because numerous other call sites must handle a null `workflowDefinition`, it follows that at this specified call site `workflow.getWorkflowDefinition()` may return null (leading to downstream NPEs where not checked).
+
+Therefore, the method can return null at this specific invocation.]]></reason>
+  <value>YES</value>
+</response>

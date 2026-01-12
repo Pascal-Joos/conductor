@@ -1,0 +1,12 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public String getWorkflowName() {
+            Utils.checkNotNull(Nullability.castToNonnull(workflowDefinition), "Workflow definition is null");
+            return Nullability.castToNonnull(workflowDefinition).getName();
+}
+  ```
+    ]]>
+  </code>
+</response>

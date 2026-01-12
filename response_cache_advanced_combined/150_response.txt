@@ -1,0 +1,11 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public Integer getTaskQueueSize(String queueName) {
+        return queueDAO.getSize(Nullability.castToNonnull(queueName));
+}
+  ```
+    ]]>
+  </code>
+</response>

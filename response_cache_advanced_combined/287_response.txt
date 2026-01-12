@@ -1,0 +1,36 @@
+```xml
+<response>
+    <reason><![CDATA[
+From this method alone, there is no explicit null-check or initialization that guarantees `t.getStatus()` is non-null before it is dereferenced.
+
+The stream filter condition is:
+
+    .filter(
+        t ->
+            TaskType.TERMINATE.name().equals(t.getTaskType())
+                && t.getStatus().isTerminal()
+                && t.getStatus().isSuccessful())
+
+This will:
+1. Evaluate `TaskType.TERMINATE.name().equals(t.getTaskType())`.
+2. If that’s true, it will then evaluate `t.getStatus().isTerminal()`.
+3. If that’s true, it will then evaluate `t.getStatus().isSuccessful()`.
+
+If `t.getStatus()` is `null` for any `TaskModel` where `TaskType.TERMINATE.name().equals(t.getTaskType())` is true, the call to `t.getStatus().isTerminal()` will produce a `NullPointerException`.
+
+The code shown does not:
+- Initialize `status` for all tasks.
+- Check `t.getStatus()` for null before calling methods on it.
+- Use any defensive programming pattern (e.g., `Optional`, `Objects.requireNonNull`) around `status`.
+
+Therefore, whether `t.getStatus()` can be null depends entirely on the contract and implementation of `TaskModel` and how its instances are constructed/populated. The method itself does not provide any guarantee of non-nullity for `getStatus()`, but it also doesn’t prove that it can actually be null in practice. Without the definition/contract of `TaskModel#getStatus()` and the lifecycle of `TaskModel` objects, we cannot conclusively say that `t.getStatus()` is or is not allowed to be null.
+
+Thus, from this snippet alone, the nullability of `t.getStatus()` is not determinable.
+    ]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the `TaskModel` class (or at least the `getStatus()` method and any relevant field definitions/annotations) so we can see whether `status` can be null.]]></request>
+        <request><![CDATA[Provide any documentation or invariants that state whether a `TaskModel` of type `TERMINATE` is guaranteed to have a non-null status.]]></request>
+    </requests>
+</response>
+```

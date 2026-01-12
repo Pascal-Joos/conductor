@@ -1,0 +1,11 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public void removeTask(String taskId) {
+        executionDAO.removeTask(Nullability.castToNonnull(taskId));
+}
+  ```
+    ]]>
+  </code>
+</response>

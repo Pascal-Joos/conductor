@@ -1,0 +1,51 @@
+<response>
+  <reason><![CDATA[
+At this call site in Join.execute:
+
+```java
+TaskModel forkedTask = workflow.getTaskByRefName(joinOnRef);
+if (forkedTask == null) {
+    // Task is not even scheduled yet
+    allDone = false;
+    break;
+}
+TaskModel.Status taskStatus = forkedTask.getStatus();
+hasFailures = !taskStatus.isSuccessful() && !forkedTask.getWorkflowTask().isOptional();
+```
+
+`forkedTask` is guaranteed non-null past the `if (forkedTask == null)` guard, but there is no guarantee anywhere that `forkedTask.getWorkflowTask()` itself is non-null.
+
+From the provided code:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+`workflowTask` is a field directly returned with no initialization or null-check shown. Several other locations in the codebase explicitly defend against the possibility that `getWorkflowTask()` returns null, for example:
+
+- In `WorkflowExecutor.getTask`:
+  ```java
+  if (task.getWorkflowTask() != null) {
+      return metadataMapperService.populateTaskWithDefinition(task);
+  }
+  ```
+- In `WorkflowExecutor.getTaskDefinition`:
+  ```java
+  return task.getTaskDefinition()
+      .orElseGet(
+          () ->
+              Optional.ofNullable(task.getWorkflowTask())
+                  .map(WorkflowTask::getName)
+                  .map(metadataDAO::getTaskDef)
+                  .orElseThrow(...));
+  ```
+  where `Optional.ofNullable(task.getWorkflowTask())` is used, explicitly allowing for null.
+- In `DoWhile` and other classes, `Optional.ofNullable(task.getWorkflowTask())` is also used consistently.
+
+These patterns show that the authors consider `task.getWorkflowTask()` potentially null in general and therefore guard against it. There is no code in `Join.execute` or in the way `forkedTask` is obtained (`workflow.getTaskByRefName`) that enforces a non-null `workflowTask` for `forkedTask`. Consequently, at this specific call site, `forkedTask.getWorkflowTask()` can evaluate to null, and the subsequent dereference `.isOptional()` would then throw a `NullPointerException`.
+
+Thus the method `getWorkflowTask()` can return null at the invocation `forkedTask.getWorkflowTask()` in `Join.execute`.]]></reason>
+  <value>YES</value>
+</response>

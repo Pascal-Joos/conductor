@@ -1,0 +1,52 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private void updateAndPushParents(WorkflowModel workflow, String operation) {
+        String workflowIdentifier = "";
+        while (workflow.hasParent()) {
+            // update parent's sub workflow task
+            TaskModel subWorkflowTask =
+                    executionDAOFacade.getTaskModel(workflow.getParentWorkflowTaskId());
+            if (Optional.ofNullable(subWorkflowTask.getWorkflowTask())
+                    .map(WorkflowTask::isOptional)
+                    .orElse(false)) {
+                // break out
+                LOGGER.info(
+                        "Sub workflow task {} is optional, skip updating parents", subWorkflowTask);
+                break;
+            }
+            subWorkflowTask.setSubworkflowChanged(true);
+            subWorkflowTask.setStatus(IN_PROGRESS);
+            executionDAOFacade.updateTask(subWorkflowTask);
+
+            // add an execution log
+            String currentWorkflowIdentifier = workflow.toShortString();
+            workflowIdentifier =
+                    !workflowIdentifier.equals("")
+                            ? String.format(
+                                    "%s -> %s", currentWorkflowIdentifier, workflowIdentifier)
+                            : currentWorkflowIdentifier;
+            TaskExecLog log =
+                    new TaskExecLog(
+                            String.format("Sub workflow %s %s.", workflowIdentifier, operation));
+            log.setTaskId(subWorkflowTask.getTaskId());
+            executionDAOFacade.addTaskExecLog(Collections.singletonList(log));
+            LOGGER.info("Task {} updated. {}", log.getTaskId(), log.getLog());
+
+            // push the parent workflow to decider queue for asynchronous 'decide'
+            String parentWorkflowId = workflow.getParentWorkflowId();
+            WorkflowModel parentWorkflow =
+                    executionDAOFacade.getWorkflowModel(parentWorkflowId, true);
+            parentWorkflow.setStatus(WorkflowModel.Status.RUNNING);
+            parentWorkflow.setLastRetriedTime(System.currentTimeMillis());
+            executionDAOFacade.updateWorkflow(parentWorkflow);
+            expediteLazyWorkflowEvaluation(parentWorkflowId);
+
+            workflow = parentWorkflow;
+        }
+}
+  ```
+    ]]>
+  </code>
+</response>

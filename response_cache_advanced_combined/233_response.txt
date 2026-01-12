@@ -1,0 +1,15 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  public WorkflowDef getWorkflowDefinition() {
+        WorkflowModel model = getWorkflowModel();
+        if (model == null) {
+            return null;
+        }
+        return model.getWorkflowDefinition();
+  }
+  ```
+    ]]>
+  </code>
+</response>

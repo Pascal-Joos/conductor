@@ -1,0 +1,25 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  private boolean requeue(Task pending) {
+        long callback = pending.getCallbackAfterSeconds();
+        if (callback < 0) {
+            callback = 0;
+        }
+        queueDAO.remove(Nullability.castToNonnull(QueueUtils.getQueueName(pending)), pending.getTaskId());
+        long now = System.currentTimeMillis();
+        callback = callback - ((now - pending.getUpdateTime()) / 1000);
+        if (callback < 0) {
+            callback = 0;
+        }
+        return queueDAO.pushIfNotExists(
+                Nullability.castToNonnull(QueueUtils.getQueueName(pending)),
+                pending.getTaskId(),
+                pending.getWorkflowPriority(),
+                callback);
+  }
+  ```
+    ]]>
+  </code>
+</response>

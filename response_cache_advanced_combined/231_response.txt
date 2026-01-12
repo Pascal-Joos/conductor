@@ -1,0 +1,26 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public TaskModel createTaskModel() {
+        TaskModel taskModel = new TaskModel();
+        taskModel.setReferenceTaskName(workflowTask.getTaskReferenceName());
+        taskModel.setWorkflowInstanceId(workflowModel.getWorkflowId());
+        taskModel.setWorkflowType(workflowModel.getWorkflowName());
+        taskModel.setCorrelationId(workflowModel.getCorrelationId());
+        taskModel.setScheduledTime(System.currentTimeMillis());
+
+        String id = taskId == null ? UUID.randomUUID().toString() : taskId;
+        taskModel.setTaskId(id);
+        taskModel.setWorkflowTask(workflowTask);
+        taskModel.setWorkflowPriority(workflowModel.getPriority());
+
+        // the following properties are overridden by some TaskMapper implementations
+        taskModel.setTaskType(workflowTask.getType());
+        taskModel.setTaskDefName(workflowTask.getName());
+        return taskModel;
+}
+  ```
+    ]]>
+  </code>
+</response>

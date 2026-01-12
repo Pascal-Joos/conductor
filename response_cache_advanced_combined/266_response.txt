@@ -1,0 +1,114 @@
+<response>
+  <reason><![CDATA[
+At the specific call site in question, the expression is:
+
+    terminateTask
+        .getWorkflowTask()
+
+Here `terminateTask` is `outcome.terminateTask` inside `DeciderService.decide(WorkflowModel workflow)`:
+
+```java
+boolean hasSuccessfulTerminateTask = false;
+for (TaskModel task : workflow.getTasks()) {
+    ...
+    if (TERMINATE.name().equals(task.getTaskType())
+            && task.getStatus().isTerminal()
+            && task.getStatus().isSuccessful()) {
+        hasSuccessfulTerminateTask = true;
+        outcome.terminateTask = task;
+    }
+}
+...
+if (hasSuccessfulTerminateTask
+        || (outcome.tasksToBeScheduled.isEmpty() && checkForWorkflowCompletion(workflow))) {
+    LOGGER.debug("Marking workflow: {} as complete.", workflow);
+    outcome.isComplete = true;
+}
+...
+return outcome;
+```
+
+`terminateTask` is later passed into `WorkflowExecutor.endExecution`:
+
+```java
+private void endExecution(WorkflowModel workflow, TaskModel terminateTask) {
+    if (terminateTask != null) {
+        String terminationStatus =
+                (String)
+                        terminateTask
+                                .getWorkflowTask()
+                                .getInputParameters()
+                                .get(Terminate.getTerminationStatusParameter());
+        String reason =
+                (String)
+                        terminateTask
+                                .getWorkflowTask()
+                                .getInputParameters()
+                                .get(Terminate.getTerminationReasonParameter());
+        ...
+    } else {
+        workflow = completeWorkflow(workflow);
+    }
+    ...
+}
+```
+
+So the call site of interest is inside `endExecution` and only executed when `terminateTask != null`.
+
+The method under analysis is:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+This is a trivial getter; it can return `null` if the field `workflowTask` is `null`. The question is whether, for this specific `terminateTask`, the `workflowTask` field is guaranteed non-null.
+
+From the provided code:
+
+* Nowhere in the `DeciderService.decide` loop is `terminateTask.setWorkflowTask(...)` or any population/guarantee of `workflowTask` shown.
+* The only logic that sets `outcome.terminateTask` is based on:
+  * `task.getTaskType()` equals `"TERMINATE"`,
+  * `task.getStatus().isTerminal()`,
+  * `task.getStatus().isSuccessful()`.
+
+None of these conditions imply that `task.getWorkflowTask()` is non-null. The `TaskModel` could have been created/loaded without a bound `WorkflowTask` instance. The code base itself recognizes that `getWorkflowTask()` may be null in many places and explicitly guards against it with `Optional.ofNullable(task.getWorkflowTask())` patterns, for example:
+
+```java
+WorkflowTask workflowTask =
+        Optional.ofNullable(loopTask.getWorkflowTask())
+                .orElseGet(() -> workflow.getWorkflowDefinition()
+                        .getTaskByRefName(loopTask.getReferenceTaskName()));
+```
+
+and:
+
+```java
+TaskModel getTask(String taskId) {
+    return Optional.ofNullable(executionDAOFacade.getTaskModel(taskId))
+            .map(task -> {
+                if (task.getWorkflowTask() != null) {
+                    return metadataMapperService.populateTaskWithDefinition(task);
+                }
+                return task;
+            })
+            .orElse(null);
+}
+```
+
+These usages demonstrate that a `TaskModel` can exist with a null `workflowTask`. There is no shown invariant or population step that would guarantee that *specifically* terminate tasks always have a non-null `workflowTask` before `endExecution` is called.
+
+Furthermore, `endExecution` itself does a null check only on `terminateTask` (the `TaskModel`), not on `terminateTask.getWorkflowTask()`. If `workflowTask` were guaranteed non-null here, defensive code using `Optional.ofNullable(...)` elsewhere for `WorkflowTask` on arbitrary tasks would be unnecessary, and we would expect some explicit enforcement or documentation of that invariant; none is evident in the provided snippets.
+
+Given:
+
+* `getWorkflowTask()` directly returns the field which may be unset,
+* `terminateTask` is obtained from a collection of tasks with no demonstrated guarantee that `workflowTask` is initialized,
+* other parts of the codebase treat `getWorkflowTask()` as nullable,
+
+the result of `terminateTask.getWorkflowTask()` at this call site is not provably non-null from the given code and can, therefore, be null at runtime.
+
+  ]]></reason>
+  <value>YES</value>
+</response>

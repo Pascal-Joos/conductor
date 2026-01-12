@@ -1,0 +1,72 @@
+<response>
+  <reason><![CDATA[
+The call site uses `doWhileTaskModel.getReferenceTaskName()` where `doWhileTaskModel` is a `TaskModel` instance representing a DO_WHILE system task in `com.netflix.conductor.core.execution.tasks.DoWhile.execute(...)`.
+
+Key points:
+
+1. **The getter itself**  
+   ```java
+   public String getReferenceTaskName() {
+       return referenceTaskName;
+   }
+   ```
+   This simply returns the field `referenceTaskName`, which is not guaranteed non‑null by the method itself.
+
+2. **How `doWhileTaskModel` is created**  
+   `doWhileTaskModel` is produced by `DoWhileTaskMapper.getMappedTasks(...)`:
+   ```java
+   TaskModel doWhileTask = taskMapperContext.createTaskModel();
+   doWhileTask.setTaskType(TaskType.TASK_TYPE_DO_WHILE);
+   ...
+   return List.of(doWhileTask);
+   ```
+   The code shown does not assign any reference task name to `doWhileTask`. That is handled implicitly by `taskMapperContext.createTaskModel()` or other framework code, whose implementation is not provided here. Therefore, from the provided code we cannot assume that `referenceTaskName` is initialized to a non‑null value.
+
+3. **Existing runtime checks elsewhere allow null referenceTaskName**  
+   Other parts of the codebase explicitly guard against or handle null reference task names, showing that `TaskModel.getReferenceTaskName()` can be null in general:
+   - In `WorkflowModel.getTaskByRefName`:
+     ```java
+     if (task.getReferenceTaskName() == null) {
+         throw new RuntimeException(
+             "Task " + task.getTaskDefName() + ", seq=" + task.getSeq()
+             + " does not have reference name specified.");
+     }
+     ```
+     This guard only runs when `getTaskByRefName` is called; it does not prevent `referenceTaskName` from ever being null on a `TaskModel`.
+   - In `DefaultEventQueueProcessor.startMonitor`:
+     ```java
+     .filter(
+         task ->
+             !task.getStatus().isTerminal()
+             && task.getReferenceTaskName() != null
+             && task.getReferenceTaskName().equals(taskRefName))
+     ```
+     This filter checks for `task.getReferenceTaskName() != null`, which would be unnecessary if `referenceTaskName` were always non‑null.
+
+   These usages show that the design allows (and expects) `referenceTaskName` to sometimes be null.
+
+4. **No local guarantee for `doWhileTaskModel`**  
+   Inside `DoWhile.execute(...)`, `doWhileTaskModel.getReferenceTaskName()` is used directly:
+   ```java
+   if (doWhileTaskModel
+           .getWorkflowTask()
+           .has(TaskUtils.removeIterationFromTaskRefName(t.getReferenceTaskName()))
+       && !doWhileTaskModel.getReferenceTaskName().equals(t.getReferenceTaskName())
+       && doWhileTaskModel.getIteration() == t.getIteration()) {
+       ...
+   }
+   ```
+   There is no preceding null-check on `doWhileTaskModel.getReferenceTaskName()`. The correctness of this code *assumes* that `referenceTaskName` is non‑null for DO_WHILE tasks, but that assumption is enforced only (if at all) in code we do not see (e.g., `TaskMapperContext.createTaskModel()` or workflow-definition validation).
+
+5. **Per the guidelines, we cannot assume behavior of unseen methods**  
+   The nullability of `referenceTaskName` for `doWhileTaskModel` depends on code not provided (e.g., how `TaskModel` is constructed via `TaskMapperContext.createTaskModel()` and how/when `referenceTaskName` is set). According to the instructions, we must not assume those implementations. Without them, there is no proof that `referenceTaskName` is always non‑null for this particular instance.
+
+Given:
+- The getter has no non‑null guarantee.
+- Other code paths show `getReferenceTaskName()` can be null.
+- The initialization path of `doWhileTaskModel.referenceTaskName` is not shown.
+
+It follows that at this specific call site, `doWhileTaskModel.getReferenceTaskName()` **can** evaluate to `null` from the perspective of the code we have, i.e., we cannot rule out null.
+  ]]></reason>
+  <value>YES</value>
+</response>

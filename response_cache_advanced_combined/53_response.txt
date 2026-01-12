@@ -1,0 +1,31 @@
+<response>
+  <reason><![CDATA[
+At this call site, `task` is a `TaskModel` instance coming from various workflows and mappers and is not guarded anywhere to ensure a non‑null `referenceTaskName`.
+
+From the provided code:
+
+- The getter itself is:
+  ```java
+  public String getReferenceTaskName() {
+      return referenceTaskName;
+  }
+  ```
+  so it simply returns the field value, which can be null unless something else guarantees initialization.
+
+- Multiple places in the code *assume* `getReferenceTaskName()` may be null and explicitly handle or check it:
+  - `WorkflowModel.getTaskByRefName` throws if it encounters a task where `task.getReferenceTaskName() == null`:
+    ```java
+    if (task.getReferenceTaskName() == null) {
+        throw new RuntimeException("Task ... does not have reference name specified.");
+    }
+    ```
+    This defensive check only runs when `getTaskByRefName` is called; it does not prevent other code paths from having a `TaskModel` with a null referenceTaskName.
+  - Several streams calling `.map(TaskModel::getReferenceTaskName)` do *not* filter out nulls unless explicitly using `filter(Objects::nonNull)`, which shows that the design admits the possibility of null reference names (e.g., `getNextTask` checks for null later, but `equals`/`hashCode` both use `Objects.equals(getReferenceTaskName(), ...)`, which is safe for null).
+  - New `TaskModel` instances are often created without setting a reference name immediately (e.g., in `WorkflowExecutor.skipTaskFromWorkflow` they are explicitly set, but in many task mappers the referenceTaskName is presumably injected via `taskMapperContext.createTaskModel()` whose implementation is not shown; until that happens, the field can be null).
+
+- No class‑wide invariant or constructor is shown that would ensure `referenceTaskName` is always non‑null for every `TaskModel` instance. The equality and hashCode implementations both treat `referenceTaskName` as nullable (using `Objects.equals` and including it in `Objects.hash`), reinforcing that null is an expected possible value.
+
+At the specific call site pattern you asked about (`task.getReferenceTaskName()`), as seen throughout the provided code (e.g., in many stream operations and in `ParametersUtils.getTaskInputV2`), there is no preceding check or guarantee that `task`’s `referenceTaskName` has been set. Therefore, given the current information, the field may be null, and this getter can return null at that call site.
+  ]]></reason>
+  <value>YES</value>
+</response>

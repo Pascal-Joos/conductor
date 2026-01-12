@@ -1,0 +1,17 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+default boolean postpone(
+            String queueName,
+             String messageId,
+            int priority,
+            long postponeDurationInSeconds) {
+        remove(queueName, messageId);
+        push(Nullability.castToNonnull(queueName), messageId, priority, postponeDurationInSeconds);
+        return true;
+}
+  ```
+    ]]>
+  </code>
+</response>

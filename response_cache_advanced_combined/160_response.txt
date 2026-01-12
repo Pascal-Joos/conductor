@@ -1,0 +1,11 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  public boolean ackTaskReceived(Task task) {
+        return queueDAO.ack(Nullability.castToNonnull(QueueUtils.getQueueName(task)), task.getTaskId());
+  }
+  ```
+    ]]>
+  </code>
+</response>

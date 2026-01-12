@@ -1,0 +1,52 @@
+<response>
+  <reason><![CDATA[
+At this call site (`workflow.getWorkflowDefinition()`), `workflow` is an instance of `WorkflowModel` whose `workflowDefinition` field is mutable and not guaranteed to be non-null.
+
+The getter itself is trivial:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowDefinition;
+}
+```
+
+There is no local initialization or null check; it simply returns the field, which can be null.
+
+Across the provided codebase, `getWorkflowDefinition()` is explicitly treated as nullable in many places:
+
+- `MetadataMapperService.populateWorkflowWithDefinitions` uses:
+  ```java
+  WorkflowDef workflowDefinition =
+      Optional.ofNullable(workflow.getWorkflowDefinition())
+          .orElseGet(() -> { ... lookupForWorkflowDefinition ... });
+  ```
+  This shows that `workflowDefinition` can be null before population.
+
+- `DeciderService.getNextTasksToBeScheduled`:
+  ```java
+  final WorkflowDef def = workflow.getWorkflowDefinition();
+  if (def == null) {
+      return null;
+  }
+  ```
+  Again, `def` is expected to sometimes be null.
+
+- `WorkflowExecutor.findChangedSubWorkflowTask`:
+  ```java
+  WorkflowDef workflowDef =
+      Optional.ofNullable(workflow.getWorkflowDefinition())
+          .orElseGet(() -> metadataDAO.getWorkflowDef(...).orElseThrow(...));
+  ```
+  This uses `Optional.ofNullable` because `getWorkflowDefinition()` may return null.
+
+- Several other locations explicitly check for `null` on `workflow.getWorkflowDefinition()` or handle it via `Optional`.
+
+There is no global invariant in the shown code that ensures `workflowDefinition` is always set before any use. In fact, we see flows where:
+
+- A `WorkflowModel` is fetched from persistence (`executionDAOFacade.getWorkflowModel(...)`) and used directly.
+- Only some paths (e.g., `restart`, or explicit calls to `metadataMapperService.populateWorkflowWithDefinitions(workflow)`) populate the workflow definition.
+- Other paths either do lazy lookup when needed (via DAO) or simply check and branch on null.
+
+Therefore, at this specific call site `workflow.getWorkflowDefinition()`, there is no prior guarantee in the provided flow that `workflowDefinition` has been populated. Since the field is nullable and is frequently handled as such, this invocation can indeed return null.]]></reason>
+  <value>YES</value>
+</response>

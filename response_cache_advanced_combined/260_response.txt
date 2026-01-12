@@ -1,0 +1,84 @@
+<response>
+  <reason><![CDATA[
+At the call site in question, `taskToBeRescheduled` in `WorkflowExecutor`:
+
+```java
+private TaskModel taskToBeRescheduled(WorkflowModel workflow, TaskModel task) {
+    TaskModel taskToBeRetried = task.copy();
+    ...
+    // perform parameter replacement for retried task
+    Map<String, Object> taskInput =
+            parametersUtils.getTaskInput(
+                    taskToBeRetried.getWorkflowTask().getInputParameters(),
+                    workflow,
+                    taskToBeRetried.getWorkflowTask().getTaskDefinition(),
+                    taskToBeRetried.getTaskId());
+    ...
+    return taskToBeRetried;
+}
+```
+
+we must determine if `taskToBeRetried.getWorkflowTask()` can be null.
+
+`taskToBeRetried` is created solely via:
+
+```java
+TaskModel taskToBeRetried = task.copy();
+```
+
+There is no code shown that modifies `workflowTask` on `taskToBeRetried` after the copy. Therefore, `taskToBeRetried.getWorkflowTask()` will be null iff `task.getWorkflowTask()` was null in the original `task`.
+
+From the provided code, the only way `taskToBeRescheduled` is invoked is inside `WorkflowExecutor.retry(WorkflowModel workflow)`:
+
+```java
+List<TaskModel> retriableTasks =
+    retriableMap.values().stream()
+        .sorted(Comparator.comparingInt(TaskModel::getSeq))
+        .map(task -> taskToBeRescheduled(finalWorkflow, task))
+        .collect(Collectors.toList());
+```
+
+`retriableMap` is populated exclusively from `workflow.getTasks()` based on task status; there is no constraint or guarantee in this population step that those `TaskModel` instances have a non-null `workflowTask`. Other parts of the codebase explicitly handle the possibility of a null `workflowTask`, e.g.:
+
+- In `DeciderService.decide`:
+
+  ```java
+  WorkflowTask workflowTask = pendingTask.getWorkflowTask();
+  if (workflowTask == null) {
+      workflowTask =
+          workflow.getWorkflowDefinition()
+              .getTaskByRefName(pendingTask.getReferenceTaskName());
+  }
+  ```
+
+  This fallback logic exists precisely because `pendingTask.getWorkflowTask()` may be null.
+
+- In `WorkflowExecutor.getTask`:
+
+  ```java
+  return Optional.ofNullable(executionDAOFacade.getTaskModel(taskId))
+      .map(task -> {
+          if (task.getWorkflowTask() != null) {
+              return metadataMapperService.populateTaskWithDefinition(task);
+          }
+          return task;
+      })
+      .orElse(null);
+  ```
+
+  Again, `task.getWorkflowTask()` is explicitly checked for null.
+
+These usages show that the system treats `TaskModel.workflowTask` as nullable in general and does not enforce that it is always populated before retry logic runs. The provided code does not add any additional guarantee, at or before `retry(workflow)`, that all entries in `retriableMap` must have a non-null `workflowTask`.
+
+Because:
+
+1. `taskToBeRetried.workflowTask` is copied directly from `task.workflowTask`,
+2. `task` comes from `workflow.getTasks()` via `retriableMap`,
+3. other code pathways clearly allow and handle null `getWorkflowTask()` on such tasks, and
+4. there is no visible precondition that filters out or populates tasks with null `workflowTask` before they enter `retriableMap`,
+
+it follows that at this specific call site, `taskToBeRetried.getWorkflowTask()` can be null, which would make the subsequent dereference (`.getInputParameters()` / `.getTaskDefinition()`) a potential NPE.
+
+Therefore, the method `getWorkflowTask()` can return null at the call site `taskToBeRetried.getWorkflowTask()`.]]></reason>
+  <value>YES</value>
+</response>

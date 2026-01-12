@@ -1,0 +1,63 @@
+```xml
+<response>
+    <reason><![CDATA[
+The expression in question is `taskStatus.isTerminal();`, where `taskStatus` is declared as:
+
+    TaskModel.Status taskStatus;
+
+`TaskModel.Status` is being used as an enum-like status type (given methods such as `isTerminal()` and `isSuccessful()` and constant references like `TaskModel.Status.SKIPPED`, `FAILED`, `COMPLETED`).
+
+There are two locations where `taskStatus` is assigned before `isTerminal()` is invoked:
+
+1) In the primary joinOn loop:
+
+    for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
+        ...
+        exclusiveTask = workflow.getTaskByRefName(joinOnRef);
+        if (exclusiveTask == null || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+            ...
+            continue;
+        }
+        taskStatus = exclusiveTask.getStatus();
+        foundExlusiveJoinOnTask = taskStatus.isTerminal();
+        ...
+
+2) In the defaultExclusiveJoinTasks loop:
+
+    for (String defaultExclusiveJoinTask : defaultExclusiveJoinTasks) {
+        ...
+        exclusiveTask = workflow.getTaskByRefName(defaultExclusiveJoinTask);
+        if (exclusiveTask == null
+                || exclusiveTask.getStatus() == TaskModel.Status.SKIPPED) {
+            ...
+            continue;
+        }
+
+        taskStatus = exclusiveTask.getStatus();
+        foundExlusiveJoinOnTask = taskStatus.isTerminal();
+        ...
+
+In both cases, before `taskStatus.isTerminal()` is called, the code does:
+
+    taskStatus = exclusiveTask.getStatus();
+
+There is no explicit null-check on `exclusiveTask.getStatus()`. If `exclusiveTask.getStatus()` can ever return null, then `taskStatus` will be null and the subsequent call `taskStatus.isTerminal()` will throw a `NullPointerException`.
+
+The rest of the method does not enforce any invariant guaranteeing a non-null status:
+
+- `exclusiveTask` is checked for `null` and for `Status.SKIPPED`, but not for `status == null`.
+- There is no `Nullability.castToNonnull` or similar on `exclusiveTask.getStatus()`.
+- The method relies solely on the contract of `TaskModel.getStatus()` to be non-null.
+
+Whether `taskStatus` can be null therefore depends entirely on the contract and implementation of `TaskModel.getStatus()` and the `TaskModel` lifecycle. The provided snippet does not show that implementation or any surrounding guarantees (such as annotations like `@Nonnull` / `@NotNull`, enum defaulting, or invariants enforced by the system).
+
+Without explicit information that `TaskModel.getStatus()` is guaranteed to always return a non-null value for any `exclusiveTask` that reaches this point (i.e., non-null and not `SKIPPED`), we cannot soundly conclude that `taskStatus` is never null.
+
+Thus, based solely on the given code, the possibility that `exclusiveTask.getStatus()` is null cannot be ruled out, so whether `taskStatus` can be null is UNKNOWN from this snippet alone.]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the implementation or documented contract of TaskModel.getStatus(), including any nullability annotations or guarantees.]]></request>
+        <request><![CDATA[Confirm whether TaskModel.Status is an enum and whether a TaskModel instance can ever exist with a null status in your system's lifecycle.]]></request>
+    </requests>
+</response>
+```

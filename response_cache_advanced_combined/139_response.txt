@@ -1,0 +1,12 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public static void recordQueueWaitTime(String taskType, long queueWaitTime) {
+        getTimer(classQualifier, "task_queue_wait", "taskType", Nullability.castToNonnull(taskType))
+                .record(queueWaitTime, TimeUnit.MILLISECONDS);
+}
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,59 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+void updateWorkflowOutput(final WorkflowModel workflow, TaskModel task) {
+        List<TaskModel> allTasks = workflow.getTasks();
+        if (allTasks.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> output = new HashMap<>();
+        Optional<TaskModel> optionalTask =
+                allTasks.stream()
+                        .filter(
+                                t ->
+                                        TaskType.TERMINATE.name().equals(t.getTaskType())
+                                                && t.getStatus() != null
+                                                && t.getStatus().isTerminal()
+                                                && t.getStatus().isSuccessful())
+                        .findFirst();
+        if (optionalTask.isPresent()) {
+            TaskModel terminateTask = optionalTask.get();
+            if (StringUtils.isNotBlank(terminateTask.getExternalOutputPayloadStoragePath())) {
+                output =
+                        externalPayloadStorageUtils.downloadPayload(
+                                terminateTask.getExternalOutputPayloadStoragePath());
+                Monitors.recordExternalPayloadStorageUsage(
+                        terminateTask.getTaskDefName(),
+                        Operation.READ.toString(),
+                        PayloadType.TASK_OUTPUT.toString());
+            } else if (!terminateTask.getOutputData().isEmpty()) {
+                output = terminateTask.getOutputData();
+            }
+        } else {
+            TaskModel last = Optional.ofNullable(task).orElse(allTasks.get(allTasks.size() - 1));
+            WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+            if (workflowDef.getOutputParameters() != null
+                    && !workflowDef.getOutputParameters().isEmpty()) {
+                output =
+                        parametersUtils.getTaskInput(
+                                workflowDef.getOutputParameters(), workflow, null, null);
+            } else if (StringUtils.isNotBlank(last.getExternalOutputPayloadStoragePath())) {
+                output =
+                        externalPayloadStorageUtils.downloadPayload(
+                                last.getExternalOutputPayloadStoragePath());
+                Monitors.recordExternalPayloadStorageUsage(
+                        last.getTaskDefName(),
+                        Operation.READ.toString(),
+                        PayloadType.TASK_OUTPUT.toString());
+            } else {
+                output = last.getOutputData();
+            }
+        }
+        workflow.setOutput(output);
+}
+  ```
+    ]]>
+  </code>
+</response>

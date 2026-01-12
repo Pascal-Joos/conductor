@@ -1,0 +1,25 @@
+```xml
+<response>
+    <reason><![CDATA[
+Based only on the provided method:
+
+public WorkflowTask getWorkflowTask() {
+        return workflowTask;
+}
+
+there is no information about:
+- where or how `workflowTask` is initialized,
+- whether it is ever assigned a non-null value,
+- whether there are any invariants or contracts guaranteeing it is never null (e.g., initialization in the constructor, @NonNull annotations, or framework guarantees),
+- or any prior null checks before this getter is called.
+
+Without visibility into the field declaration of `workflowTask`, its initialization, and the broader class logic, we cannot conclude that `workflowTask` is always non-null. It is therefore not possible to rule out the possibility that `workflowTask` is null at the time this method is called.
+
+Thus, from the available information, the nullability of the returned expression cannot be determined.]]></reason>
+    <value>UNKNOWN</value>
+    <requests>
+        <request><![CDATA[Provide the declaration of the `workflowTask` field (including any annotations) and its initialization points (constructors, setters, or other methods where it is assigned).]]></request>
+        <request><![CDATA[Indicate whether any framework or coding convention guarantees that `workflowTask` is non-null (e.g., dependency injection lifecycle, validation steps, or invariants documented for this class).]]></request>
+    </requests>
+</response>
+```

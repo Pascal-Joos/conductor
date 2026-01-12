@@ -1,0 +1,48 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof TaskMapperContext)) {
+            return false;
+        }
+
+        TaskMapperContext that = (TaskMapperContext) o;
+
+        if (getRetryCount() != that.getRetryCount()) {
+            return false;
+        }
+        if (getWorkflowDefinition() != null
+                ? !getWorkflowDefinition().equals(that.getWorkflowDefinition())
+                : that.getWorkflowDefinition() != null) {
+            return false;
+        }
+        if (getWorkflowModel() != null
+                ? !getWorkflowModel().equals(that.getWorkflowModel())
+                : that.getWorkflowModel() != null) {
+            return false;
+        }
+        if (getWorkflowTask() != null
+                ? !getWorkflowTask().equals(that.getWorkflowTask())
+                : that.getWorkflowTask() != null) {
+            return false;
+        }
+        if (getTaskInput() != null
+                ? !getTaskInput().equals(that.getTaskInput())
+                : that.getTaskInput() != null) {
+            return false;
+        }
+        if (getRetryTaskId() != null
+                ? !getRetryTaskId().equals(that.getRetryTaskId())
+                : that.getRetryTaskId() != null) {
+            return false;
+        }
+        return getTaskId().equals(that.getTaskId());
+  ```
+    ]]>
+  </code>
+</response>

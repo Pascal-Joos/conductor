@@ -1,0 +1,53 @@
+<response>
+  <reason><![CDATA[
+At this specific call site (`workflow.getWorkflowDefinition()` used throughout the provided code), there is no global guarantee that `workflowDefinition` is non‑null.
+
+Key observations:
+
+1. The getter itself:
+   ```java
+   public WorkflowDef getWorkflowDefinition() {
+       return workflowDefinition;
+   }
+   ```
+   simply returns the field; it does not enforce non‑null.
+
+2. There are multiple call sites that explicitly handle the possibility of `null`, proving that `workflowDefinition` can legitimately be `null` for some `WorkflowModel` instances:
+   - `MetadataMapperService.populateWorkflowWithDefinitions`:
+     ```java
+     WorkflowDef workflowDefinition =
+             Optional.ofNullable(workflow.getWorkflowDefinition())
+                     .orElseGet(() -> { ... });
+     ```
+     This code only performs the lookup and `setWorkflowDefinition` if `getWorkflowDefinition()` returns `null`. Before this method is called, `workflow.getWorkflowDefinition()` may be `null`.
+
+   - `DeciderService.checkWorkflowTimeout`:
+     ```java
+     WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+     if (workflowDef == null) {
+         LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+         return;
+     }
+     ```
+     This method explicitly anticipates a `null` return value and branches on it.
+
+   - `WorkflowStatusListener.onWorkflowCompletedIfEnabled`:
+     ```java
+     WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+     if (workflowDef != null && workflowDef.isWorkflowStatusListenerEnabled()) {
+         onWorkflowCompleted(workflow);
+     }
+     ```
+     Again, `null` is considered a valid possibility.
+
+3. Many other usages dereference the result without a null check, but those usages do not establish that the field must always be non‑null; they only show that those code paths assume it was already initialized (often by `MetadataMapperService.populateWorkflowWithDefinitions` or via `WorkflowExecutor.restart`). In other parts of the code (e.g., `checkWorkflowTimeout`, `populateWorkflowWithDefinitions`), the authors clearly treat `workflowDefinition` as potentially absent.
+
+4. No invariant is shown that guarantees `workflowDefinition` is always set before any call to `getWorkflowDefinition()`. In fact, the logic in `populateWorkflowWithDefinitions` is specifically designed to populate it lazily when it is `null`.
+
+Because the getter is a direct field return and the surrounding codebase both:
+- reads it with null‑checks in several places, and
+- contains logic that only initializes it if found to be `null`,
+
+the invocation `workflow.getWorkflowDefinition()` can evaluate to `null` at runtime at this call site.]]></reason>
+  <value>YES</value>
+</response>

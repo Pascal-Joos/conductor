@@ -1,0 +1,67 @@
+<response>
+  <reason><![CDATA[
+At this call site:
+
+```java
+TaskModel.Status taskStatus = forkedTask.getStatus();
+```
+
+`forkedTask` is a `TaskModel` obtained from:
+
+```java
+TaskModel forkedTask = workflow.getTaskByRefName(joinOnRef);
+if (forkedTask == null) {
+    // Task is not even scheduled yet
+    allDone = false;
+    break;
+}
+TaskModel.Status taskStatus = forkedTask.getStatus();
+```
+
+So `forkedTask` itself is guaranteed non‑null when `getStatus()` is called.
+
+However, `getStatus()` simply returns the field:
+
+```java
+public Status getStatus() {
+    return status;
+}
+```
+
+There is no initialization or invariant in the provided code that guarantees `status` is always non‑null. In fact, multiple places explicitly check for null before using `getStatus()`:
+
+- `DoWhileTaskMapper`:
+
+```java
+if (task != null && task.getStatus() != null && task.getStatus().isTerminal()) {
+    // ...
+}
+```
+
+- `ExecutionDAOFacade.updateTask`:
+
+```java
+if (taskModel.getStatus() != null) {
+    if (!taskModel.getStatus().isTerminal() ...
+```
+
+- `DeciderService.checkTaskPollTimeout`:
+
+```java
+if (taskDef.getPollTimeoutSeconds() == null
+        || taskDef.getPollTimeoutSeconds() <= 0
+        || task.getStatus() == null
+        || !task.getStatus().equals(SCHEDULED)) {
+    return;
+}
+```
+
+These guards demonstrate that a `TaskModel` with `status == null` is considered possible by the codebase.
+
+Additionally, there are call sites that clearly set status before use (e.g., in various `*TaskMapper` classes and in polling), but for the specific `forkedTask` used in `Join.execute`, nothing in the shown code guarantees that every `TaskModel` returned from `workflow.getTaskByRefName(joinOnRef)` has had its `status` set. `workflow.getTasks()` is a mutable collection, and tasks are created and manipulated in many code paths; no global invariant is enforced that would prevent a `TaskModel` in that list from having `status == null`.
+
+Thus, at this specific call site, `forkedTask` is non‑null, but `forkedTask.getStatus()` can legally evaluate to `null`, based on the class design and other null checks around `getStatus()`.
+
+Therefore this invocation can produce a null value for `taskStatus`.]]></reason>
+  <value>YES</value>
+</response>

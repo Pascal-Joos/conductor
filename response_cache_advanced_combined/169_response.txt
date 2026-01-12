@@ -1,0 +1,58 @@
+<response>
+  <reason><![CDATA[
+At this call site, `rerunFromTask` is a `TaskModel` selected from existing workflow tasks, and `getTaskType()` simply returns the field `taskType` with no additional logic:
+
+```java
+public String getTaskType() {
+    return taskType;
+}
+```
+
+Within `WorkflowExecutor.rerunWF(...)`, `rerunFromTask` is obtained in one of two ways:
+
+1. From the current workflow:
+   ```java
+   for (TaskModel task : workflow.getTasks()) {
+       if (task.getTaskId().equals(taskId)) {
+           rerunFromTask = task;
+           break;
+       }
+   }
+   ```
+2. From a parent workflow when the task is in a sub‑workflow:
+   ```java
+   for (TaskModel task : workflow.getTasks()) {
+       if (task.getTaskType().equalsIgnoreCase(TaskType.TASK_TYPE_SUB_WORKFLOW)) {
+           String subWorkflowId = task.getSubWorkflowId();
+           if (rerunWF(subWorkflowId, taskId, taskInput, null, null)) {
+               rerunFromTask = task;
+               break;
+           }
+       }
+   }
+   ```
+
+In both cases, `rerunFromTask` refers to an already-existing task in `workflow.getTasks()` that was previously created by one of the various TaskMappers or system logic. Across these mappers and flows:
+
+- Many mappers explicitly set `taskType` (e.g., `HumanTaskMapper`, `WaitTaskMapper`, `InlineTaskMapper`, `TerminateTaskMapper`, `DoWhileTaskMapper`, `EventTaskMapper`, `LambdaTaskMapper`).
+- For user-defined / worker tasks, `taskType` is implicitly the workflow task’s name/type and is used throughout the codebase as a non‑null discriminator (e.g., comparisons with `TaskType.TASK_TYPE_SUB_WORKFLOW`, `TASK_TYPE_WAIT`, `TASK_TYPE_HUMAN`, `TaskType.isBuiltIn(task.getTaskType())`, numerous `systemTaskRegistry.isSystemTask(task.getTaskType())` calls, use in `QueueUtils.getQueueName(task)`, logging, metrics, `equals`/`hashCode`).
+
+The code repeatedly treats `taskType` as non‑null (e.g., calling `equalsIgnoreCase`, using it as a map key, and passing it into APIs that assume non‑null) without any null checks. A null `taskType` would cause `NullPointerException` in many of these call sites, which is inconsistent with how the framework is designed to operate.
+
+Crucially, at this specific call site:
+
+```java
+if (systemTaskRegistry.isSystemTask(rerunFromTask.getTaskType())
+        && !systemTaskRegistry.get(rerunFromTask.getTaskType()).isAsync()) {
+    ...
+} else {
+    ...
+}
+```
+
+`rerunFromTask` is a member of `workflow.getTasks()` coming out of normal engine execution. For such tasks, `taskType` is always set at construction time by the mappers or system components and is subsequently relied upon extensively. There is no code path in the provided snippets that constructs or inserts a `TaskModel` into `workflow.getTasks()` with a null `taskType`, nor any code that sets `taskType` back to null.
+
+Therefore, at this specific invocation `rerunFromTask.getTaskType()`, the underlying `taskType` field is assumed non‑null by design and cannot be null in normal operation.
+  ]]></reason>
+  <value>NO</value>
+</response>

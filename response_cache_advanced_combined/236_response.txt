@@ -1,0 +1,62 @@
+```xml
+<response>
+    <reason><![CDATA[
+The expression in question is the enhanced for-loop header:
+
+    for (String joinOnRef : joinOn) {
+
+The variable `joinOn` is declared and assigned as:
+
+    List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+After this assignment, there are only two relevant code paths before the loop:
+
+1. If `task.isLoopOverTask()` is true:
+    
+       if (task.isLoopOverTask()) {
+           joinOn =
+               Nullability.castToNonnull(joinOn).stream()
+                       .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
+                       .collect(Collectors.toList());
+       }
+
+   Here, `joinOn` is passed into `Nullability.castToNonnull(joinOn)`.  
+   - If `joinOn` were null at this point, `Nullability.castToNonnull` would either:
+     - Throw an exception (if it enforces non-null), in which case the method would not continue to the for-loop; or
+     - Return null (if it does no checking), in which case `joinOn.stream()` would immediately throw a `NullPointerException`.  
+
+   In either case, execution would not reach the for-loop with a null `joinOn` on this branch; the method would already have failed. There is no path from here to the `for` loop with `joinOn` remaining null without having thrown.
+
+2. If `task.isLoopOverTask()` is false:
+
+   The initial assignment stands:
+
+       List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+   and there are no further assignments to `joinOn` before the loop. If `task.getInputData().get("joinOn")` returns null, `joinOn` will be null at the for-loop. There is no null-check or defensive handling before the loop. The final loop is:
+
+       for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
+
+   Note that your question text shows `for (String joinOnRef : joinOn) {`, but the provided method shows:
+
+       for (String joinOnRef : Nullability.castToNonnull(joinOn)) {
+
+   In either case, the essential issue is the same:
+
+   - If the actual code is `for (String joinOnRef : joinOn) {`, then `joinOn` can be null if the input map does not contain `"joinOn"` or contains a null value for it, and a `NullPointerException` would occur at loop entry.
+   - If the actual code is `for (String joinOnRef : Nullability.castToNonnull(joinOn)) {`, then whether a `NullPointerException` happens at this point or within `castToNonnull` depends entirely on `Nullability.castToNonnull`’s contract. From the call site alone, there is no prior guarantee that `joinOn` is non-null; the only thing that could make this safe is a documented guarantee that:
+       a) `task.getInputData().get("joinOn")` never returns null, or  
+       b) `Nullability.castToNonnull` itself never returns null and handles null arguments in a defined, non-exceptional way.
+
+Since we have no information that `task.getInputData().get("joinOn")` is guaranteed non-null and no formal contract for `Nullability.castToNonnull`, there is a valid control-flow path:
+
+   - `task.isLoopOverTask()` is false, and
+   - `task.getInputData().get("joinOn")` returns null,
+
+that leads to the `for` loop expression being evaluated with `joinOn == null`.
+
+Therefore, from the method body alone, `joinOn` can be null when used in that loop, unless there is an external guarantee (not visible here) about the non-nullness of `"joinOn"` in the task input or the behavior of `Nullability.castToNonnull`.
+    ]]></reason>
+    <value>YES</value>
+</response>
+```

@@ -1,0 +1,52 @@
+<response>
+  <reason><![CDATA[
+At this call site, `workflow` is an instance of `WorkflowModel`, and `getWorkflowDefinition()` simply returns the backing field:
+
+```java
+public WorkflowDef getWorkflowDefinition() {
+    return workflowDefinition;
+}
+```
+
+There is no guarantee in the shown code that `workflowDefinition` is always non‑null when `workflow.getWorkflowDefinition()` is called. In fact, multiple call sites explicitly handle or check for a null workflow definition, proving that `workflowDefinition` can be null at runtime:
+
+- In `DeciderService.getNextTasksToBeScheduled`:
+  ```java
+  final WorkflowDef def = workflow.getWorkflowDefinition();
+  if (def == null) {
+      return null;
+  }
+  ```
+- In `DeciderService.getNextTask`:
+  ```java
+  final WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef == null) {
+      return Collections.emptyList();
+  }
+  ```
+- In `DeciderService.checkWorkflowTimeout`:
+  ```java
+  WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef == null) {
+      LOGGER.warn("Missing workflow definition : {}", workflow.getWorkflowId());
+      return;
+  }
+  ```
+- In `WorkflowStatusListener.onWorkflowCompletedIfEnabled`:
+  ```java
+  WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+  if (workflowDef != null && workflowDef.isWorkflowStatusListenerEnabled()) {
+      ...
+  }
+  ```
+- In `MetadataMapperService.populateWorkflowWithDefinitions`:
+  ```java
+  WorkflowDef workflowDefinition =
+      Optional.ofNullable(workflow.getWorkflowDefinition())
+              .orElseGet(() -> { ... });
+  ```
+  This explicitly uses `Optional.ofNullable(...)`, confirming that `getWorkflowDefinition()` may return null and that the service is designed to populate it when missing.
+
+Other code paths either (a) assume non‑null and would NPE if `workflowDefinition` is missing, or (b) are guarded by preceding calls that populate it (e.g., `populateWorkflowWithDefinitions` in some flows), but there is no global invariant that such population has happened before every use. Since the field is not initialized or enforced as non‑null in the given code, and multiple callers defensively check for null, the method can indeed return null at this call site.]]></reason>
+  <value>YES</value>
+</response>

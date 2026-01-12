@@ -1,0 +1,20 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+boolean scheduleNextIteration(
+            TaskModel doWhileTaskModel, WorkflowModel workflow, WorkflowExecutor workflowExecutor) {
+        LOGGER.debug(
+                "Scheduling loop tasks for task {} as condition {} evaluated to true",
+                doWhileTaskModel.getTaskId(),
+                Optional.ofNullable(doWhileTaskModel.getWorkflowTask())
+                        .map(WorkflowTask::getLoopCondition)
+                        .orElse(null));
+        workflowExecutor.scheduleNextIteration(doWhileTaskModel, workflow);
+        return true; // Return true even though status not changed. Iteration has to be updated in
+        // execution DAO.
+}
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,51 @@
+```xml
+<response>
+    <reason><![CDATA[
+The potentially nullable part is:
+
+    taskMappers
+        .getOrDefault(type, taskMappers.get(USER_DEFINED.name()))
+
+Analysis of possible nulls:
+
+1. `taskMappers` itself  
+   - The snippet does not show where or how `taskMappers` is initialized. If `taskMappers` is a field or variable that might be null (e.g., not injected, not assigned, or cleared), then `taskMappers` could be null and the entire expression would immediately throw a `NullPointerException` when calling `getOrDefault`.  
+   - There is no visible null-check on `taskMappers` in this method.
+
+2. `taskMappers.get(USER_DEFINED.name())` (the default value)  
+   - `Map.get()` returns null if the key is not present.  
+   - If the map does not contain an entry for `USER_DEFINED.name()`, this default value will be null.  
+   - `Map.getOrDefault(key, defaultValue)` returns the default *as-is*, even if the default is null.
+
+3. Behavior of `getOrDefault`  
+   - If `type` is not present as a key in `taskMappers`, `getOrDefault(type, taskMappers.get(USER_DEFINED.name()))` returns whatever `taskMappers.get(USER_DEFINED.name())` returned.  
+   - Therefore, if there is no mapping for the `type` key and no mapping for `USER_DEFINED.name()`, the overall `getOrDefault(...)` call will return null.
+
+4. Downstream usage  
+   - The returned value is immediately dereferenced:
+
+        .getOrDefault(...).getMappedTasks(taskMapperContext)
+
+     If `.getOrDefault(...)` is null, this will cause a `NullPointerException`.  
+   - Since the code is written without a null-check, the method is only safe if there is an external guarantee that either:
+     - `taskMappers` always contains a mapper for every possible `type`, **or**
+     - `taskMappers` always contains a non-null mapping for `USER_DEFINED.name()` that acts as a universal fallback.
+
+5. Contract/semantics considerations  
+   - The snippet itself does not show such a guarantee.  
+   - Whether the map is always populated with a non-null value at `USER_DEFINED.name()` is a design/initialization detail outside this snippet.  
+   - Java’s type system alone does not prevent `taskMappers.get(USER_DEFINED.name())` from being null, nor does it prevent missing keys.
+
+Given only the provided code, there is no explicit guarantee in this method that:
+- `taskMappers` is non-null, and
+- `taskMappers.get(USER_DEFINED.name())` is non-null.
+
+Therefore, from this isolated method, it is entirely possible (in some runtime configurations) that:
+
+    taskMappers.getOrDefault(type, taskMappers.get(USER_DEFINED.name()))
+
+evaluates to null.
+    ]]></reason>
+    <value>YES</value>
+</response>
+```

@@ -1,0 +1,49 @@
+<response>
+  <reason><![CDATA[
+The call site in question is `task.getReferenceTaskName()` where `task` is a `TaskModel` instance.
+
+The implementation of `getReferenceTaskName()` is:
+
+```java
+public String getReferenceTaskName() {
+    return referenceTaskName;
+}
+```
+
+There is no null check or defaulting logic here: it simply returns the backing field `referenceTaskName`, which is a plain instance field on `TaskModel`.
+
+Across the provided code, `referenceTaskName` is:
+
+- Explicitly checked for null in `WorkflowModel.getTaskByRefName`:
+  ```java
+  if (task.getReferenceTaskName() == null) {
+      throw new RuntimeException(
+              "Task " + task.getTaskDefName() + ", seq=" + task.getSeq()
+              + " does not have reference name specified.");
+  }
+  ```
+  This shows that the authors consider `getReferenceTaskName()` possibly returning null, and they enforce non-nullness only in that specific context by throwing if it is null.
+
+- Explicitly filtered with a null check in `DefaultEventQueueProcessor.startMonitor`:
+  ```java
+  .filter(
+      task ->
+          !task.getStatus().isTerminal()
+              && task.getReferenceTaskName() != null
+              && task.getReferenceTaskName().equals(taskRefName))
+  ```
+  Here, the null-check `task.getReferenceTaskName() != null` is necessary to avoid NPE, which again implies `getReferenceTaskName()` can be null.
+
+- Set directly from external inputs without any guarantee of non-null, e.g. in `WorkflowExecutor.skipTaskFromWorkflow`:
+  ```java
+  taskToBeSkipped.setReferenceTaskName(taskReferenceName);
+  ```
+  and `taskReferenceName` ultimately comes from a method parameter, not internally guaranteed to be non-null by the shown code.
+
+No invariant or constructor is shown that guarantees `referenceTaskName` is always initialized to a non-null value for all `TaskModel` instances; many flows rely on it being set by mappers or callers, and other parts of the code defensively handle the null case.
+
+Therefore, for the generic call site `task.getReferenceTaskName()` (with no additional context constraining `task` to one of the places where a prior null check or enforced non-nullness has occurred), the method can return null because the underlying field `referenceTaskName` can be null.
+
+]]></reason>
+  <value>YES</value>
+</response>

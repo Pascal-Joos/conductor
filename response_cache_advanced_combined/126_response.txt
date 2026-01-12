@@ -1,0 +1,80 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private void retry(WorkflowModel workflow) {
+        // Get all FAILED or CANCELED tasks that are not COMPLETED (or reach other terminal states)
+        // on further executions.
+        // // Eg: for Seq of tasks task1.CANCELED, task1.COMPLETED, task1 shouldn't be retried.
+        // Throw an exception if there are no FAILED tasks.
+        // Handle JOIN task CANCELED status as special case.
+        Map<String, TaskModel> retriableMap = new HashMap<>();
+        for (TaskModel task : workflow.getTasks()) {
+            switch (Nullability.castToNonnull(task.getStatus())) {
+                case FAILED:
+                case FAILED_WITH_TERMINAL_ERROR:
+                case TIMED_OUT:
+                    retriableMap.put(task.getReferenceTaskName(), task);
+                    break;
+                case CANCELED:
+                    if (task.getTaskType().equalsIgnoreCase(TaskType.JOIN.toString())
+                            || task.getTaskType().equalsIgnoreCase(TaskType.DO_WHILE.toString())) {
+                        task.setStatus(IN_PROGRESS);
+                        addTaskToQueue(task);
+                        // Task doesn't have to be updated yet. Will be updated along with other
+                        // Workflow tasks downstream.
+                    } else {
+                        retriableMap.put(task.getReferenceTaskName(), task);
+                    }
+                    break;
+                default:
+                    retriableMap.remove(task.getReferenceTaskName());
+                    break;
+            }
+        }
+
+        // if workflow TIMED_OUT due to timeoutSeconds configured in the workflow definition,
+        // it may not have any unsuccessful tasks that can be retried
+        if (retriableMap.values().size() == 0
+                && workflow.getStatus() != WorkflowModel.Status.TIMED_OUT) {
+            throw new ConflictException(
+                    "There are no retryable tasks! Use restart if you want to attempt entire workflow execution again.");
+        }
+
+        // Update Workflow with new status.
+        // This should load Workflow from archive, if archived.
+        workflow.setStatus(WorkflowModel.Status.RUNNING);
+        workflow.setLastRetriedTime(System.currentTimeMillis());
+        String lastReasonForIncompletion = workflow.getReasonForIncompletion();
+        workflow.setReasonForIncompletion(null);
+        // Add to decider queue
+        queueDAO.push(
+                DECIDER_QUEUE,
+                workflow.getWorkflowId(),
+                workflow.getPriority(),
+                properties.getWorkflowOffsetTimeout().getSeconds());
+        executionDAOFacade.updateWorkflow(workflow);
+        LOGGER.info(
+                "Workflow {} that failed due to '{}' was retried",
+                workflow.toShortString(),
+                lastReasonForIncompletion);
+
+        // taskToBeRescheduled would set task `retried` to true, and hence it's important to
+        // updateTasks after obtaining task copy from taskToBeRescheduled.
+        final WorkflowModel finalWorkflow = workflow;
+        List<TaskModel> retriableTasks =
+                retriableMap.values().stream()
+                        .sorted(Comparator.comparingInt(TaskModel::getSeq))
+                        .map(task -> taskToBeRescheduled(finalWorkflow, task))
+                        .collect(Collectors.toList());
+
+        dedupAndAddTasks(workflow, retriableTasks);
+        // Note: updateTasks before updateWorkflow might fail when Workflow is archived and doesn't
+        // exist in primary store.
+        executionDAOFacade.updateTasks(workflow.getTasks());
+        scheduleTask(workflow, retriableTasks);
+}
+  ```
+    ]]>
+  </code>
+</response>

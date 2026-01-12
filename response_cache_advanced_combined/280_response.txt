@@ -1,0 +1,47 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  @Override
+    public List<TaskModel> getMappedTasks(TaskMapperContext taskMapperContext) {
+        LOGGER.debug("TaskMapperContext {} in DoWhileTaskMapper", taskMapperContext);
+
+        WorkflowTask workflowTask = taskMapperContext.getWorkflowTask();
+        WorkflowModel workflowModel = taskMapperContext.getWorkflowModel();
+
+        TaskModel task = workflowModel.getTaskByRefName(workflowTask.getTaskReferenceName());
+        if (task != null && task.getStatus() != null && task.getStatus().isTerminal()) {
+            // Since loopTask is already completed no need to schedule task again.
+            return List.of();
+        }
+
+        TaskDef taskDefinition =
+                Optional.ofNullable(taskMapperContext.getTaskDefinition())
+                        .orElseGet(
+                                () ->
+                                        Optional.ofNullable(
+                                                        metadataDAO.getTaskDef(
+                                                                workflowTask.getName()))
+                                                .orElseGet(TaskDef::new));
+
+        TaskModel doWhileTask = taskMapperContext.createTaskModel();
+        doWhileTask.setTaskType(TaskType.TASK_TYPE_DO_WHILE);
+        doWhileTask.setStatus(TaskModel.Status.IN_PROGRESS);
+        doWhileTask.setStartTime(System.currentTimeMillis());
+        doWhileTask.setRateLimitPerFrequency(taskDefinition.getRateLimitPerFrequency());
+        doWhileTask.setRateLimitFrequencyInSeconds(taskDefinition.getRateLimitFrequencyInSeconds());
+        doWhileTask.setRetryCount(taskMapperContext.getRetryCount());
+
+        Map<String, Object> taskInput =
+                parametersUtils.getTaskInputV2(
+                        workflowTask.getInputParameters(),
+                        workflowModel,
+                        doWhileTask.getTaskId(),
+                        taskDefinition);
+        doWhileTask.setInputData(taskInput);
+        return List.of(doWhileTask);
+    }
+  ```
+    ]]>
+  </code>
+</response>

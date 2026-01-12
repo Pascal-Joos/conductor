@@ -1,0 +1,33 @@
+```xml
+<response>
+    <reason><![CDATA[
+The variable `joinOn` is obtained via:
+
+    List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+There is no null check on `joinOn` before it is used in:
+
+    if (task.isLoopOverTask()) {
+        joinOn =
+                joinOn.stream()
+                        .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
+                        .collect(Collectors.toList());
+    }
+
+Whether `joinOn` can be null depends entirely on:
+1. What `task.getInputData()` returns for the key `"joinOn"`.
+2. Any guarantees from the caller or framework that `"joinOn"` will always be present and non-null in the task's input data for this task type.
+
+From the method body itself:
+- `task.getInputData()` is assumed non-null, but that isn't enforced here.
+- `get("joinOn")` may return `null` if the key is absent or explicitly mapped to `null`.
+- There is no defensive check (`if (joinOn == null)`) or default value.
+- `joinOn` is dereferenced immediately with `joinOn.stream()` if `task.isLoopOverTask()` is true.
+
+Therefore, from the code shown and without additional contractual guarantees on `task.getInputData()`, `joinOn` can be null and cause a `NullPointerException` at `joinOn.stream()`.
+
+Because the question asks for a determination based solely on the given method and standard Java semantics (without relying on undocumented invariants of `task` or the workflow engine), the safe conclusion is that `joinOn` can be null on that line.
+    ]]></reason>
+    <value>YES</value>
+</response>
+```

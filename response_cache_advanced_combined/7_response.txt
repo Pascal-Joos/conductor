@@ -1,0 +1,24 @@
+<response>
+  <reason><![CDATA[
+The potential null comes from `resolvedParams.get("name")`. The only information we have about `resolvedParams` is that it is the result of:
+
+```java
+Map<String, Object> resolvedParams =
+    getSubWorkflowInputParameters(workflowModel, subWorkflowParams);
+```
+
+and that it is a `Map<String, Object>`. For any `Map`, `get("name")` can legally return `null` if:
+
+- The key `"name"` is not present, or
+- The key is present but explicitly mapped to `null`.
+
+Nothing in the shown code checks for the presence of the `"name"` key, nor is there any guard (e.g., `Objects.requireNonNull`, explicit validation, or exception) that would guarantee it is non-null before `toString()` is called.
+
+Whether `"name"` is always populated (and non-null) depends entirely on how `getSubWorkflowInputParameters` constructs and populates the map. Since we have no declaration or implementation of that method, we cannot assume it always sets a non-null value for `"name"`.
+
+Because of this, it is entirely possible, from the perspective of this call site, that `resolvedParams.get("name")` returns `null`, which would then cause a `NullPointerException` at `.toString()`. Thus, the invocation can yield `null` before `toString()` is applied.
+
+Therefore, at this specific call site, `resolvedParams.get("name")` can be `null.`
+]]></reason>
+  <value>YES</value>
+</response>

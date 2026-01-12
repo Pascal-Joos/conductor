@@ -1,0 +1,41 @@
+<response>
+  <reason><![CDATA[
+The call site in question is any occurrence of:
+
+    task.getReferenceTaskName()
+
+where `task` is of type `TaskModel`.
+
+The method `TaskModel.getReferenceTaskName()` simply returns the field `referenceTaskName`:
+
+```java
+public String getReferenceTaskName() {
+    return referenceTaskName;
+}
+```
+
+There are multiple usages of `getReferenceTaskName()` in the provided code where the value is explicitly assumed to be potentially null:
+
+1. In `WorkflowModel.getTaskByRefName`:
+   ```java
+   for (TaskModel task : tasks) {
+       if (task.getReferenceTaskName() == null) {
+           throw new RuntimeException(
+                   "Task " + task.getTaskDefName() + ", seq=" + task.getSeq()
+                   + " does not have reference name specified.");
+       }
+       if (task.getReferenceTaskName().equals(refName)) {
+           found.add(task);
+       }
+   }
+   ```
+   This method explicitly checks `task.getReferenceTaskName() == null` and throws if it is null, which confirms that `referenceTaskName` can be null on some `TaskModel` instances.
+
+2. In many other places, the code only *uses* `getReferenceTaskName()` (e.g., as map keys, for comparisons, for logging) but does not establish any general invariant that the field is always initialized to a non-null value. There is no global setter or constructor contract shown that enforces non-nullity.
+
+Because `getReferenceTaskName()` is just a direct field getter, it will return whatever is stored in `referenceTaskName`. Since at least one site in the provided codebase explicitly guards against the case where `getReferenceTaskName()` is null, and no universal non-null guarantee is enforced, the method can indeed return null at its call sites, including the generic `task.getReferenceTaskName()` call site you asked about.
+
+Thus, for that call site, you must treat the return value as nullable.
+  ]]></reason>
+  <value>YES</value>
+</response>

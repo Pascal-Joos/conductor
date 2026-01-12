@@ -1,0 +1,27 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public void addTaskToQueue(TaskModel task) {
+            // put in queue
+            String taskQueueName = QueueUtils.getQueueName(task);
+            if (task.getCallbackAfterSeconds() > 0) {
+                queueDAO.push(
+                        Nullability.castToNonnull(taskQueueName),
+                        task.getTaskId(),
+                        task.getWorkflowPriority(),
+                        task.getCallbackAfterSeconds());
+            } else {
+                queueDAO.push(Nullability.castToNonnull(taskQueueName), task.getTaskId(), task.getWorkflowPriority(), 0);
+            }
+            LOGGER.debug(
+                    "Added task {} with priority {} to queue {} with call back seconds {}",
+                    task,
+                    task.getWorkflowPriority(),
+                    taskQueueName,
+                    task.getCallbackAfterSeconds());
+}
+  ```
+    ]]>
+  </code>
+</response>

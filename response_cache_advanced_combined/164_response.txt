@@ -1,0 +1,15 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+  public void removeTaskFromQueue(String taskId) {
+        Task task = getTask(taskId);
+        if (task == null) {
+            throw new NotFoundException("No such task found by taskId: %s", taskId);
+        }
+        queueDAO.remove(Nullability.castToNonnull(QueueUtils.getQueueName(task)), taskId);
+  }
+  ```
+    ]]>
+  </code>
+</response>

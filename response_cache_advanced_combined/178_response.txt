@@ -1,0 +1,47 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    public String updateWorkflow(WorkflowModel workflowModel) {
+        workflowModel.setUpdatedTime(System.currentTimeMillis());
+        if (workflowModel.getStatus().isTerminal()) {
+            workflowModel.setEndTime(System.currentTimeMillis());
+        }
+        externalizeWorkflowData(workflowModel);
+        executionDAO.updateWorkflow(workflowModel);
+        if (properties.isAsyncIndexingEnabled()) {
+            if (workflowModel.getStatus().isTerminal()
+                    && workflowModel.getEndTime() - Nullability.castToNonnull(workflowModel.getCreateTime())
+                            < properties.getAsyncUpdateShortRunningWorkflowDuration().toMillis()) {
+                final String workflowId = workflowModel.getWorkflowId();
+                DelayWorkflowUpdate delayWorkflowUpdate = new DelayWorkflowUpdate(workflowId);
+                LOGGER.debug(
+                        "Delayed updating workflow: {} in the index by {} seconds",
+                        workflowId,
+                        properties.getAsyncUpdateDelay());
+                scheduledThreadPoolExecutor.schedule(
+                        delayWorkflowUpdate,
+                        properties.getAsyncUpdateDelay().getSeconds(),
+                        TimeUnit.SECONDS);
+                Monitors.recordWorkerQueueSize(
+                        "delayQueue", scheduledThreadPoolExecutor.getQueue().size());
+            } else {
+                indexDAO.asyncIndexWorkflow(new WorkflowSummary(workflowModel.toWorkflow()));
+            }
+            if (workflowModel.getStatus().isTerminal()) {
+                workflowModel
+                        .getTasks()
+                        .forEach(
+                                taskModel ->
+                                        indexDAO.asyncIndexTask(
+                                                new TaskSummary(taskModel.toTask())));
+            }
+        } else {
+            indexDAO.indexWorkflow(new WorkflowSummary(workflowModel.toWorkflow()));
+        }
+        return workflowModel.getWorkflowId();
+}
+  ```
+    ]]>
+  </code>
+</response>

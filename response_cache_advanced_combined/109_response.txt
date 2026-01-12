@@ -1,0 +1,33 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+private boolean isIterationComplete(
+            TaskModel doWhileTaskModel, Map<String, TaskModel> referenceNameToModel) {
+        List<WorkflowTask> workflowTasksInsideDoWhile =
+                Optional.ofNullable(doWhileTaskModel.getWorkflowTask())
+                        .map(WorkflowTask::getLoopOver)
+                        .orElse(Collections.emptyList());
+        int iteration = doWhileTaskModel.getIteration();
+        boolean allTasksTerminal = true;
+        for (WorkflowTask workflowTaskInsideDoWhile : workflowTasksInsideDoWhile) {
+            String taskReferenceName =
+                    TaskUtils.appendIteration(
+                            workflowTaskInsideDoWhile.getTaskReferenceName(), iteration);
+            if (referenceNameToModel.containsKey(taskReferenceName)) {
+                TaskModel taskModel = referenceNameToModel.get(taskReferenceName);
+                if (!taskModel.getStatus().isTerminal()) {
+                    allTasksTerminal = false;
+                    break;
+                }
+            } else {
+                allTasksTerminal = false;
+                break;
+            }
+        }
+        return allTasksTerminal;
+}
+  ```
+    ]]>
+  </code>
+</response>

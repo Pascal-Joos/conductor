@@ -1,0 +1,55 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+@VisibleForTesting
+    boolean evaluateCondition(WorkflowModel workflow, TaskModel task) throws ScriptException {
+        TaskDef taskDefinition = task.getTaskDefinition().orElse(null);
+        WorkflowTask workflowTask = Optional.ofNullable(task.getWorkflowTask()).orElse(null);
+        Map<String, Object> conditionInput =
+                parametersUtils.getTaskInputV2(
+                        Optional.ofNullable(workflowTask)
+                                .map(WorkflowTask::getInputParameters)
+                                .orElse(Collections.emptyMap()),
+                        workflow,
+                        task.getTaskId(),
+                        taskDefinition);
+        conditionInput.put(task.getReferenceTaskName(), task.getOutputData());
+        List<TaskModel> loopOver =
+                workflow.getTasks().stream()
+                        .filter(
+                                tttt ->
+                                        (Optional.ofNullable(workflowTask)
+                                                        .map(
+                                                                wt ->
+                                                                        wt.has(
+                                                                                TaskUtils
+                                                                                        .removeIterationFromTaskRefName(
+                                                                                                tttt
+                                                                                                        .getReferenceTaskName())))
+                                                        .orElse(false)
+                                                && !task.getReferenceTaskName()
+                                                        .equals(tttt.getReferenceTaskName())))
+                        .collect(Collectors.toList());
+
+        for (TaskModel loopOverTask : loopOver) {
+            conditionInput.put(
+                    TaskUtils.removeIterationFromTaskRefName(loopOverTask.getReferenceTaskName()),
+                    loopOverTask.getOutputData());
+        }
+
+        String condition =
+                Optional.ofNullable(workflowTask)
+                        .map(WorkflowTask::getLoopCondition)
+                        .orElse(null);
+        boolean result = false;
+        if (condition != null) {
+            LOGGER.debug("Condition: {} is being evaluated", condition);
+            result = ScriptEvaluator.evalBool(condition, conditionInput);
+        }
+        return result;
+}
+  ```
+    ]]>
+  </code>
+</response>

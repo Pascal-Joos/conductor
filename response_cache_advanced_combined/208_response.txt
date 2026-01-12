@@ -1,0 +1,95 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+public Map<String, Object> getTaskInputV2(
+            Map<String, Object> input,
+            WorkflowModel workflow,
+             String taskId,
+             TaskDef taskDefinition) {
+        Map<String, Object> inputParams;
+
+        if (input != null) {
+            inputParams = clone(input);
+        } else {
+            inputParams = new HashMap<>();
+        }
+        if (taskDefinition != null && taskDefinition.getInputTemplate() != null) {
+            clone(taskDefinition.getInputTemplate()).forEach(inputParams::putIfAbsent);
+        }
+
+        Map<String, Map<String, Object>> inputMap = new HashMap<>();
+
+        Map<String, Object> workflowParams = new HashMap<>();
+        workflowParams.put("input", workflow.getInput());
+        workflowParams.put("output", workflow.getOutput());
+        workflowParams.put("status", workflow.getStatus());
+        workflowParams.put("workflowId", workflow.getWorkflowId());
+        workflowParams.put("parentWorkflowId", workflow.getParentWorkflowId());
+        workflowParams.put("parentWorkflowTaskId", workflow.getParentWorkflowTaskId());
+        workflowParams.put("workflowType", workflow.getWorkflowName());
+        workflowParams.put("version", workflow.getWorkflowVersion());
+        workflowParams.put("correlationId", workflow.getCorrelationId());
+        workflowParams.put("reasonForIncompletion", workflow.getReasonForIncompletion());
+        workflowParams.put(
+                "schemaVersion",
+                Optional.ofNullable(workflow.getWorkflowDefinition())
+                        .map(WorkflowDef::getSchemaVersion)
+                        .orElse(null));
+        workflowParams.put("variables", workflow.getVariables());
+
+        inputMap.put("workflow", workflowParams);
+
+        // For new workflow being started the list of tasks will be empty
+        workflow.getTasks().stream()
+                .map(TaskModel::getReferenceTaskName)
+                .map(workflow::getTaskByRefName)
+                .forEach(
+                        task -> {
+                            Map<String, Object> taskParams = new HashMap<>();
+                            taskParams.put("input", task.getInputData());
+                            taskParams.put("output", task.getOutputData());
+                            taskParams.put("taskType", task.getTaskType());
+                            if (task.getStatus() != null) {
+                                taskParams.put("status", task.getStatus().toString());
+                            }
+                            taskParams.put("referenceTaskName", task.getReferenceTaskName());
+                            taskParams.put("retryCount", task.getRetryCount());
+                            taskParams.put("correlationId", task.getCorrelationId());
+                            taskParams.put("pollCount", task.getPollCount());
+                            taskParams.put("taskDefName", task.getTaskDefName());
+                            taskParams.put("scheduledTime", task.getScheduledTime());
+                            taskParams.put("startTime", task.getStartTime());
+                            taskParams.put("endTime", task.getEndTime());
+                            taskParams.put("workflowInstanceId", task.getWorkflowInstanceId());
+                            taskParams.put("taskId", task.getTaskId());
+                            taskParams.put(
+                                    "reasonForIncompletion", task.getReasonForIncompletion());
+                            taskParams.put("callbackAfterSeconds", task.getCallbackAfterSeconds());
+                            taskParams.put("workerId", task.getWorkerId());
+                            taskParams.put("iteration", task.getIteration());
+                            inputMap.put(
+                                    task.isLoopOverTask()
+                                            ? TaskUtils.removeIterationFromTaskRefName(
+                                                    task.getReferenceTaskName())
+                                            : task.getReferenceTaskName(),
+                                    taskParams);
+                        });
+
+        Configuration option =
+                Configuration.defaultConfiguration().addOptions(Option.SUPPRESS_EXCEPTIONS);
+        DocumentContext documentContext = JsonPath.parse(inputMap, option);
+        Map<String, Object> replacedTaskInput = replace(inputParams, documentContext, taskId);
+        if (taskDefinition != null && taskDefinition.getInputTemplate() != null) {
+            // If input for a given key resolves to null, try replacing it with one from
+            // inputTemplate, if it exists.
+            replacedTaskInput.replaceAll(
+                    (key, value) ->
+                            (value == null) ? taskDefinition.getInputTemplate().get(key) : value);
+        }
+        return replacedTaskInput;
+}
+  ```
+    ]]>
+  </code>
+</response>

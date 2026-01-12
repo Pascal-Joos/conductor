@@ -1,0 +1,35 @@
+```xml
+<response>
+    <reason><![CDATA[
+The variable `joinOn` is initialized as:
+
+    List<String> joinOn = (List<String>) task.getInputData().get("joinOn");
+
+There is no null-check on `joinOn` before it is used in:
+
+    if (task.isLoopOverTask()) {
+        joinOn =
+                joinOn.stream()
+                        .map(name -> TaskUtils.appendIteration(name, task.getIteration()))
+                        .collect(Collectors.toList());
+    }
+
+For `joinOn.stream()` to be safe, `joinOn` must be non-null.
+
+From the provided method body:
+- `task.getInputData()` is assumed non-null (typical for Conductor `TaskModel`, but not enforced in this snippet).
+- The `get("joinOn")` call on the input map can legally return `null` if the key "joinOn" is not present or explicitly mapped to null.
+- There is no fallback, default initialization, or validation logic in this method that guarantees "joinOn" is present in the input.
+- No external contract is shown that would guarantee that `task.getInputData().get("joinOn")` is always non-null when `execute` is called, especially in combination with `task.isLoopOverTask()` being true.
+
+Therefore, from the method alone, the following path is clearly possible:
+1. `task.getInputData().get("joinOn")` returns `null`.
+2. `joinOn` is assigned `null`.
+3. `task.isLoopOverTask()` returns `true`.
+4. The `if` block executes and calls `joinOn.stream()`, causing a `NullPointerException`.
+
+Unless there is an external, strictly enforced contract (e.g., workflow definition validation that guarantees `joinOn` is always present and non-null whenever `isLoopOverTask()` can be true), `joinOn` can be null at the point `joinOn.stream()` is called.
+    ]]></reason>
+    <value>YES</value>
+</response>
+```

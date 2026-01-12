@@ -1,0 +1,51 @@
+<response>
+  <reason><![CDATA[
+The call site in question is `subWorkflowTask.getWorkflowTask()` inside `WorkflowExecutor.updateAndPushParents`:
+
+```java
+TaskModel subWorkflowTask =
+        executionDAOFacade.getTaskModel(workflow.getParentWorkflowTaskId());
+if (subWorkflowTask.getWorkflowTask().isOptional()) {
+    // ...
+}
+```
+
+Here:
+
+1. `subWorkflowTask` is obtained directly from `executionDAOFacade.getTaskModel(...)`. There is no check or guarantee in this method that `subWorkflowTask.getWorkflowTask()` is non‑null.
+
+2. The earlier `WorkflowExecutor.getTask(String taskId)` method *does* conditionally populate workflow task definitions:
+
+```java
+public TaskModel getTask(String taskId) {
+    return Optional.ofNullable(executionDAOFacade.getTaskModel(taskId))
+            .map(task -> {
+                if (task.getWorkflowTask() != null) {
+                    return metadataMapperService.populateTaskWithDefinition(task);
+                }
+                return task;
+            })
+            .orElse(null);
+}
+```
+
+This shows that tasks can exist whose `workflowTask` field is `null` (otherwise the null check would be unnecessary). It also shows that `executionDAOFacade.getTaskModel(taskId)` can return a `TaskModel` whose `getWorkflowTask()` is `null`, because only if `getWorkflowTask() != null` does it call `populateTaskWithDefinition`.
+
+3. In `updateAndPushParents`, `executionDAOFacade.getTaskModel(...)` is called **directly**, bypassing `WorkflowExecutor.getTask(...)`. Therefore, there is no population step and no non‑null guarantee. The returned `TaskModel` may legitimately have `workflowTask == null`.
+
+4. Since `getWorkflowTask()` is just:
+
+```java
+public WorkflowTask getWorkflowTask() {
+    return workflowTask;
+}
+```
+
+and `workflowTask` can be `null` (as evidenced by other code paths that check for null), the call `subWorkflowTask.getWorkflowTask()` at this site can return `null`.
+
+The subsequent dereference `subWorkflowTask.getWorkflowTask().isOptional()` would then throw a `NullPointerException`, but per your rules, that is still a null return from `getWorkflowTask()` (the NPE is a consequence, not an alternative return path).
+
+Therefore, at this specific call site, the result of `subWorkflowTask.getWorkflowTask()` can be null.
+]]></reason>
+  <value>YES</value>
+</response>

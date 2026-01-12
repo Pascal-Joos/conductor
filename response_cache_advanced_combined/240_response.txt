@@ -1,0 +1,73 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+    @SuppressWarnings("unchecked")
+    @Override
+    public void start(WorkflowModel workflow, TaskModel task, WorkflowExecutor workflowExecutor) {
+        Map<String, Object> input = task.getInputData();
+        String name = Nullability.castToNonnull(input.get("subWorkflowName")).toString();
+        int version = (int) Nullability.castToNonnull(input.get("subWorkflowVersion"));
+
+        WorkflowDef workflowDefinition = null;
+        if (input.get("subWorkflowDefinition") != null) {
+            // convert the value back to workflow definition object
+            workflowDefinition =
+                    objectMapper.convertValue(
+                            input.get("subWorkflowDefinition"), WorkflowDef.class);
+            name = workflowDefinition.getName();
+        }
+
+        Map<String, String> taskToDomain = workflow.getTaskToDomain();
+        if (input.get("subWorkflowTaskToDomain") instanceof Map) {
+            taskToDomain = (Map<String, String>) input.get("subWorkflowTaskToDomain");
+        }
+
+        var wfInput = (Map<String, Object>) input.get("workflowInput");
+        if (wfInput == null || wfInput.isEmpty()) {
+            wfInput = input;
+        }
+        String correlationId = workflow.getCorrelationId();
+
+        try {
+            StartWorkflowInput startWorkflowInput = new StartWorkflowInput();
+            startWorkflowInput.setWorkflowDefinition(workflowDefinition);
+            startWorkflowInput.setName(name);
+            startWorkflowInput.setVersion(version);
+            startWorkflowInput.setWorkflowInput(wfInput);
+            startWorkflowInput.setCorrelationId(correlationId);
+            startWorkflowInput.setParentWorkflowId(workflow.getWorkflowId());
+            startWorkflowInput.setParentWorkflowTaskId(task.getTaskId());
+            startWorkflowInput.setTaskToDomain(taskToDomain);
+
+            String subWorkflowId = startWorkflowOperation.execute(startWorkflowInput);
+
+            task.setSubWorkflowId(subWorkflowId);
+            // For backwards compatibility
+            task.addOutput(SUB_WORKFLOW_ID, subWorkflowId);
+
+            // Set task status based on current sub-workflow status, as the status can change in
+            // recursion by the time we update here.
+            WorkflowModel subWorkflow = workflowExecutor.getWorkflow(subWorkflowId, false);
+            updateTaskStatus(subWorkflow, task);
+        } catch (TransientException te) {
+            LOGGER.info(
+                    "A transient backend error happened when task {} in {} tried to start sub workflow {}.",
+                    task.getTaskId(),
+                    workflow.toShortString(),
+                    name);
+        } catch (Exception ae) {
+
+            task.setStatus(TaskModel.Status.FAILED);
+            task.setReasonForIncompletion(ae.getMessage());
+            LOGGER.error(
+                    "Error starting sub workflow: {} from workflow: {}",
+                    name,
+                    workflow.toShortString(),
+                    ae);
+        }
+    }
+  ```
+    ]]>
+  </code>
+</response>

@@ -1,0 +1,14 @@
+<response>
+  <success>true</success>
+  <code><![CDATA[
+  ```java
+default void onWorkflowCompletedIfEnabled(WorkflowModel workflow) {
+        WorkflowDef workflowDef = workflow.getWorkflowDefinition();
+        if (workflowDef != null && workflowDef.isWorkflowStatusListenerEnabled()) {
+            onWorkflowCompleted(workflow);
+        }
+}
+  ```
+    ]]>
+  </code>
+</response>

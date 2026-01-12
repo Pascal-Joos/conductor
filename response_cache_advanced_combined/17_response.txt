@@ -1,0 +1,6 @@
+<response>
+    <reason><![CDATA[
+The method name `withTaskInput` does not start with `init` or `initialize`, nor is it a known framework lifecycle method like `onCreate` or `init` from the listed examples. Its behavior (setting a single field and returning `this` on a `Builder`) corresponds to a fluent setter, which by your criteria should *not* be treated as an initializer method for NullAway.
+    ]]></reason>
+    <value>NO</value>
+</response>
